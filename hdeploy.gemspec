@@ -15,11 +15,11 @@ Gem::Specification.new do |s|
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
 
-  s.add_runtime_dependency 'json',    '~> 1.7.7'
-  s.add_runtime_dependency 'curb',    '~> 0.8.5'
-  s.add_runtime_dependency 'inifile',   '~> 2.0.2'  
-  s.add_runtime_dependency 'deep_clone', '~> 0.0.1' # For configuration
-  s.add_runtime_dependency 'deep_merge', '~> 1.1.1'
+  s.add_runtime_dependency 'json',    '~> 1.7'
+  s.add_runtime_dependency 'curb',    '~> 0.8'
+  s.add_runtime_dependency 'inifile',   '~> 2.0'  
+  s.add_runtime_dependency 'deep_clone', '~> 0.0' # For configuration
+  s.add_runtime_dependency 'deep_merge', '~> 1.1'
 
-  s.add_development_dependency 'pry'
+  s.add_development_dependency 'pry', '~> 0'
 end
