@@ -10,16 +10,16 @@ Gem::Specification.new do |s|
   s.summary       = %q{no summary}
   s.homepage      = "https://github.com/hdeploy/hdeploy"
 
-  s.files         = `git ls-files`.split($/) # FIXME: ignore omnibus
+  s.files         = `git ls-files`.split($/).select{|i| not i.start_with? 'omnibus/'}
   s.executables   = s.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]
 
-  s.add_runtime_dependency 'json',    '>= 1.7.7'
-  s.add_runtime_dependency 'curb',    '>= 0.8.5'
-  s.add_runtime_dependency 'inifile',   '>= 2.0.2'  
-  s.add_runtime_dependency 'deep_clone', '>= 0.0.1' # For configuration
-  s.add_runtime_dependency 'deep_merge', '>= 1.1.1'
+  s.add_runtime_dependency 'json',    '~> 1.7.7'
+  s.add_runtime_dependency 'curb',    '~> 0.8.5'
+  s.add_runtime_dependency 'inifile',   '~> 2.0.2'  
+  s.add_runtime_dependency 'deep_clone', '~> 0.0.1' # For configuration
+  s.add_runtime_dependency 'deep_merge', '~> 1.1.1'
 
   s.add_development_dependency 'pry'
 end
