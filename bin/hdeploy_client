@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+
+# FIXME: this allows to load without bundle or installing the gem
+$LOAD_PATH.unshift File.expand_path(File.join(__FILE__,'../../lib'))
+
+require 'hdeploy'
+
+# Note: this means this can't really be done by executing
+node = HDeploy::Client.new
+
+# Fixme: slightly better error msgs etc
+
+if ARGV.length == 0
+  raise "please specify a command such symlink post_distribute_run_once post_symlink_run_once"
+else
+  if ARGV.first == 'symlink'
+    # we need special syntax: symlink app env
+    params = {}
+    STDIN.read.split(' ').each do |param|
+      k,v = param.split(':')
+      params[k] = v
+    end
+
+    client.symlink(params)
+
+  elsif %w[symlink post_distribute_run_once post_symlink_run_once].include? ARGV.first
+
+    # Decode the next ARGV stuff. This encoding k:v is the simplest I found.
+    params = {}
+    STDIN.read.split(' ').each do |param|
+      k,v = param.split(':')
+      params[k] = v
+    end
+
+    client.run_hook(ARGV[0],params)
+  else
+    client.send(ARGV.first)
+  end
+end

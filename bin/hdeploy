@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+# FIXME: this allows to load without bundle or installing the gem
+$LOAD_PATH.unshift File.expand_path(File.join(__FILE__,'../../lib'))
+
+require 'hdeploy'
+
+cli = HDeploy::CLI.new
+cli.run!
+

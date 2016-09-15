@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Perform necessary hdeploy removal steps
+# after package is uninstalled.
+#
+
+echo "hdeploy has been uninstalled!"
+
+exit 0
