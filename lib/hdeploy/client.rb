@@ -9,7 +9,7 @@ module HDeploy
   class Client
 
     def initialize
-      @conf = HDeploy::Conf.instance('./hdeploy.conf.json')
+      @conf = HDeploy::Conf.instance('./hdeploy.conf.json') #FIXME search for the configuration at the right place
       @conf.add_defaults({
         'client' => {
           'keepalive_delay' => 60,
@@ -171,7 +171,7 @@ module HDeploy
               # FIXME: add altsource and BREAK
               # FIXME: don't run download as root!!
               #####
-              if f = find_executable('aria2')
+              if f = find_executable('aria2c')
                 system("#{f} -x 5 -d #{tgzpath} -o #{artifact}.tar.gz #{artdata['source']}")
 
               elsif f = find_executable('wget')
