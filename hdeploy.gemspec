@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.summary       = %q{no summary}
   s.homepage      = "https://github.com/hdeploy/hdeploy"
 
-  s.files         = `git ls-files`.split($/).select{|i| not i.start_with? 'omnibus/'}
+  s.files         = `git ls-files`.split($/).select{|i| not i.start_with? 'omnibus/' and not i.downcase.start_with? 'vagrant' }
   s.executables   = s.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
   s.require_paths = ["lib"]

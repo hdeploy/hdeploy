@@ -1,0 +1,8 @@
+#!/bin/sh
+
+exec 2>&1
+while [ true ]; do
+  <%= node['hdeploy']['install_path'] %>/embedded/bin/hdeploy_client check_deploy
+  sleep <%= node['hdeploy']['client_check_deploy']['sleep_time'] %>
+done
+

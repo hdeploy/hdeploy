@@ -9,7 +9,7 @@ module HDeploy
   class Client
 
     def initialize
-      @conf = HDeploy::Conf.instance('./hdeploy.conf.json') #FIXME search for the configuration at the right place
+      @conf = HDeploy::Conf.instance #FIXME search for the configuration at the right place
       @conf.add_defaults({
         'client' => {
           'keepalive_delay' => 60,

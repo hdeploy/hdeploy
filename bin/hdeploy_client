@@ -11,7 +11,7 @@ node = HDeploy::Client.new
 # Fixme: slightly better error msgs etc
 
 if ARGV.length == 0
-  raise "please specify a command such symlink post_distribute_run_once post_symlink_run_once"
+  raise "please specify a command such symlink post_distribute_run_once post_symlink_run_once keepalive"
 else
   if ARGV.first == 'symlink'
     # we need special syntax: symlink app env
@@ -33,6 +33,17 @@ else
     end
 
     client.run_hook(ARGV[0],params)
+  elsif ARGV.first == 'keepalive'
+
+    if ARGV.count == 2
+      if ARGV.last.to_i > 10 and ARGV.last.to_i < 300 # just reasonnable values
+        (HDeploy::Conf.instance)['client']['keepalive_delay'] = ARGV.last.to_i
+      else
+        raise "if you specify a keepalive, it must be a number of seconds between 10 and 300 - default is #{(HDeploy::Conf.instance)['client']['keepalive_delay']}"
+      end
+    end
+    client.send('keepalive')
+
   else
     client.send(ARGV.first)
   end

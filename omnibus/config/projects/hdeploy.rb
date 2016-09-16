@@ -1,5 +1,5 @@
 #
-# Copyright 2016 YOUR NAME
+# Copyright 2016 Patrick Viet
 #
 # All Rights Reserved.
 #
@@ -20,10 +20,16 @@ dependency "preparation"
 
 # hdeploy dependencies/components
 dependency "ruby"
-override :ruby, version: "2.3.1"
-
+dependency "runit"
 dependency "curl"
+
+override :'chef-gem', version: '12.8.1'
+override :ruby, version: "2.3.1"
+override :git, version: "2.8.2"
+
 dependency "hdeploy"
+dependency "omnibus-hdeploy-cookbooks"
+dependency "hdeploy-ctl"
 
 # Version manifest file
 dependency "version-manifest"

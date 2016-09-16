@@ -11,12 +11,27 @@ module HDeploy
     attr_reader :file
 
     def initialize(file)
+      
+      # this is for omnibus and such
+      # not very elegant but it works...
+      if file.nil?
+        require 'pry'
+        f = __FILE__
+        if f.start_with? '/opt/hdeploy/'
+          file = '/opt/hdeploy/etc/hdeploy.json'
+        elsif f.start_with? '/opt/hdeploy-server/'
+          file = '/opt/hdeploy-server/etc/hdeploy.json'
+        else
+          file = './hdeploy.json'
+        end
+      end
+
       @file = file
       reload
     end
 
     # FIXME: find a good way to set default path
-    def self.instance(path = '/opt/hdeploy/etc/hdeploy.conf.json')
+    def self.instance(path = nil)
       @@instance ||= new(path)
     end
 
