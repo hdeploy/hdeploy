@@ -71,7 +71,7 @@ end
 
 def configure
   # This just means run chef
-  run_command("<%= install_dir %>/embedded/bin/chef-solo -c <%= install_dir %>/cookbooks/solo.rb -o hdeploy")
+  run_command("<%= install_dir %>/embedded/bin/chef-solo -c <%= install_dir %>/embedded/cookbooks/solo.rb -o omnibus-hdeploy::client")
 end
 
 def help

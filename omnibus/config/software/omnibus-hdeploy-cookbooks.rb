@@ -17,13 +17,15 @@
 # Patrick's note: totally stole this from Chef's supermarket.
 # https://github.com/chef/supermarket/blob/c3aa5369f7c88c2ff206809dd814325c3428e609/omnibus/config/software/supermarket-cookbooks.rb
 
+require 'json'
+
 name 'omnibus-hdeploy-cookbooks'
 
 #dependency "berkshelf" : no - well just assume it was ok from another version.
 
 default_version '0.0.1'
 
-source path: "cookbooks/omnibus-hdeploy"
+source path: "cookbooks"
 
 build do
   cookbooks_path = "#{install_dir}/embedded/cookbooks"
@@ -34,7 +36,7 @@ build do
 
   block do
     open("#{cookbooks_path}/dna.json", "w") do |file|
-      file.write JSON.fast_generate(run_list: ['recipe[omnibus-hdeploy::default]'])
+      file.write ::JSON.fast_generate(run_list: ['recipe[omnibus-hdeploy::default]'])
     end
 
     open("#{cookbooks_path}/solo.rb", "w") do |file|

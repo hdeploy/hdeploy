@@ -16,6 +16,9 @@ build do
 
   block do
 
+    command "mkdir -p #{install_dir}/bin" unless File.exists? "#{install_dir}/bin"
+    command "mkdir -p #{install_dir}/embedded/bin" unless File.exists? "#{install_dir}/embedded/bin"
+
     # This is just a wrapper that cleans up environment
     erb source: "hdeploy-ctl.erb",
         dest: "#{install_dir}/bin/hdeploy-ctl",
@@ -24,7 +27,7 @@ build do
 
     # This is the real thing
     erb source: "hdeploy-ctl.rb.erb",
-        dest: "#{install_dir}/bin/hdeploy-ctl.rb",
+        dest: "#{install_dir}/embedded/bin/hdeploy-ctl.rb",
         mode: 0755,
         vars: { install_dir: install_dir }
 
