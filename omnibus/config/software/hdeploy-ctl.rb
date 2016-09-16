@@ -3,6 +3,7 @@ name 'hdeploy-ctl'
 
 dependency "chef-gem"
 dependency "runit"
+dependency "omnibus-hdeploy-cookbooks"
 
 default_version '0.0.1' # WTF
 

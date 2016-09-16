@@ -28,7 +28,7 @@ override :ruby, version: "2.3.1"
 override :git, version: "2.8.2"
 
 dependency "hdeploy"
-dependency "omnibus-hdeploy-cookbooks"
+#dependency "omnibus-hdeploy-cookbooks"
 dependency "hdeploy-ctl"
 
 # Version manifest file

@@ -17,9 +17,9 @@
 # Patrick's note: totally stole this from Chef's supermarket.
 # https://github.com/chef/supermarket/blob/c3aa5369f7c88c2ff206809dd814325c3428e609/omnibus/config/software/supermarket-cookbooks.rb
 
-name 'hdeploy-cookbooks'
+name 'omnibus-hdeploy-cookbooks'
 
-dependency "berkshelf"
+#dependency "berkshelf" : no - well just assume it was ok from another version.
 
 default_version '0.0.1'
 
@@ -29,7 +29,8 @@ build do
   cookbooks_path = "#{install_dir}/embedded/cookbooks"
   env = with_standard_compiler_flags(with_embedded_path)
 
-  command "berks vendor #{cookbooks_path}", env: env
+  command "#{install_dir}/embedded/bin/gem install --no-rdoc --no-ri berkshelf" # FIXME: gemfile and version
+  command "#{install_dir}/embedded/bin/berks vendor #{cookbooks_path}", env: env
 
   block do
     open("#{cookbooks_path}/dna.json", "w") do |file|
