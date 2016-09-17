@@ -31,12 +31,12 @@ build do
   cookbooks_path = "#{install_dir}/embedded/cookbooks"
   env = with_standard_compiler_flags(with_embedded_path)
 
-  command "#{install_dir}/embedded/bin/gem install --no-rdoc --no-ri berkshelf" # FIXME: gemfile and version
+  command "#{install_dir}/embedded/bin/gem install --no-rdoc --no-ri berkshelf -v 5.1.0" # FIXME: gemfile
   command "#{install_dir}/embedded/bin/berks vendor #{cookbooks_path}", env: env
 
   block do
     open("#{cookbooks_path}/dna.json", "w") do |file|
-      file.write ::JSON.fast_generate(run_list: ['recipe[omnibus-hdeploy::default]'])
+      file.write ::JSON.fast_generate(run_list: ['recipe[omnibus-hdeploy::client]'])
     end
 
     open("#{cookbooks_path}/solo.rb", "w") do |file|

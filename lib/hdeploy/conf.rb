@@ -15,7 +15,6 @@ module HDeploy
       # this is for omnibus and such
       # not very elegant but it works...
       if file.nil?
-        require 'pry'
         f = __FILE__
         if f.start_with? '/opt/hdeploy/'
           file = '/opt/hdeploy/etc/hdeploy.json'

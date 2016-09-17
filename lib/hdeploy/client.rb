@@ -3,7 +3,6 @@ require 'json'
 require 'fileutils'
 require 'pathname'
 require 'inifile'
-require 'pry'
 
 module HDeploy
   class Client

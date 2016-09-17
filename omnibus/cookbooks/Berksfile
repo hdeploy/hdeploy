@@ -1,6 +1,6 @@
 source "https://supermarket.chef.io"
 
-cookbook 'enterprise', :git => 'https://github.com/hdeploy/enterprise-chef-common', :tag => '0.10.1'
+cookbook 'enterprise', :git => 'https://github.com/hdeploy/enterprise-chef-common' # I patched master
 cookbook 'omnibus-hdeploy', :path => './omnibus-hdeploy' # FIXME: put in a separate repo?
 
 # Don't know why it's 1.6.0 but the original did that so ...
