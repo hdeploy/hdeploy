@@ -23,7 +23,7 @@ dependency "ruby"
 dependency "runit"
 dependency "curl"
 
-override :'chef-gem', version: '12.12.60' # Because otherwise with Ruby 2.3 it will throw big warnings
+override :'chef-gem', version: '12.14.60' # Because otherwise with Ruby 2.3 it will throw big warnings
 override :ruby, version: "2.3.1"
 override :git, version: "2.8.2"
 
