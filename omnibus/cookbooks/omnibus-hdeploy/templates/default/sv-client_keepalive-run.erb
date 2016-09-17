@@ -2,7 +2,7 @@
 
 exec 2>&1
 while [ true ]; do
-  <%= node['hdeploy']['install_path'] %>/embedded/bin/hdeploy_client keepalive <%= node['hdeploy']['client_check_deploy']['sleep_time'] %>
-  sleep <%= node['hdeploy']['client_check_deploy']['sleep_time'] %>
+  <%= node['hdeploy']['install_path'] %>/embedded/bin/hdeploy_client keepalive <%= node['hdeploy']['client_check_deploy']['exec_interval'] %>
+  sleep <%= node['hdeploy']['client_check_deploy']['exec_interval'] %>
 done
 

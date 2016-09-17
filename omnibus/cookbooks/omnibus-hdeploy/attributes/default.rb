@@ -10,4 +10,5 @@ default['hdeploy']['install_path'] = '/opt/hdeploy' # This is very important for
   default['hdeploy'][component]['log_directory'] = "/var/log/hdeploy/#{component}"
   default['hdeploy'][component]['log_rotation']['file_maxbytes'] = 104857600
   default['hdeploy'][component]['log_rotation']['num_to_keep'] = 10
+  default['hdeploy'][component]['log_rotation']['exec_interval'] = 60
 end
