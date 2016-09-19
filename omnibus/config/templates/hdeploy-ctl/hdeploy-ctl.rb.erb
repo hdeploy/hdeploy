@@ -27,6 +27,10 @@ def get_all_services
   get_all_services_files.map { |f| File.basename(f) }
 end
 
+def service_enabled?(service_name)
+  File.symlink?(File.join("<%= install_dir %>", "service", service_name))
+end
+
 def sv_command_list
   %w[status up down once pause cont hup alarm interrupt quit 1 2 term kill start stop restart shutdown force-stop force-reload force-restart force-shutdown check]
 end
