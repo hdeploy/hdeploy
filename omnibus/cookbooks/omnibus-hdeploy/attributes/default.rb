@@ -1,6 +1,6 @@
 default['enterprise']['name'] = 'hdeploy'
 
-default['hdeploy']['fqdn'] = node['fqdn'].downcase
+default['hdeploy']['fqdn'] = (node['fqdn'] or node['hostname']).downcase
 default['hdeploy']['sysvinit_id'] = 'HD' # Must be HS for HDeploy Server
 
 default['hdeploy']['install_path'] = '/opt/hdeploy' # This is very important for the enterprise cookbook
