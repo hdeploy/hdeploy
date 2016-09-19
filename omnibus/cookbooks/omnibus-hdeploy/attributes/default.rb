@@ -7,8 +7,8 @@ default['hdeploy']['install_path'] = '/opt/hdeploy' # This is very important for
 
 %w[client_check_deploy client_keepalive].each do |component|
   default['hdeploy'][component]['enable'] = true
+  default['hdeploy'][component]['exec_interval'] = 60
   default['hdeploy'][component]['log_directory'] = "/var/log/hdeploy/#{component}"
   default['hdeploy'][component]['log_rotation']['file_maxbytes'] = 104857600
   default['hdeploy'][component]['log_rotation']['num_to_keep'] = 10
-  default['hdeploy'][component]['log_rotation']['exec_interval'] = 60
 end
