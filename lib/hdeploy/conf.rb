@@ -17,9 +17,9 @@ module HDeploy
       if file.nil?
         f = __FILE__
         if f.start_with? '/opt/hdeploy/'
-          file = '/opt/hdeploy/etc/hdeploy.json'
+          file = '/opt/hdeploy/hdeploy.json'
         elsif f.start_with? '/opt/hdeploy-server/'
-          file = '/opt/hdeploy-server/etc/hdeploy.json'
+          file = '/opt/hdeploy-server/hdeploy-server.json'
         else
           file = './hdeploy.json'
         end
