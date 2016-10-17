@@ -1,16 +1,19 @@
 name 'hdeploy-ctl'
-#license :project_license
 
-dependency "chef-gem"
-dependency "runit"
-dependency "hdeploy-cookbooks"
+dependency 'chef-gem'
+dependency 'runit'
+dependency 'hdeploy-cookbook'
 
-default_version '0.0.1' # WTF
+default_version '0.0.1'
+
+#source path: File.expand_path(project.files_path)
 
 build do
   env = with_standard_compiler_flags(with_embedded_path)
 
   #bundle "install", env: env
+
+  gem "install pry --no-rdoc --no-ri", env: env # Fixme: version
 
   block do
 
@@ -19,15 +22,15 @@ build do
 
     # This is just a wrapper that cleans up environment
     erb source: "hdeploy-ctl.erb",
-        dest: "#{install_dir}/bin/hdeploy-ctl",
+        dest: "#{install_dir}/bin/#{project.name}-ctl",
         mode: 0755,
-        vars: { embedded_bin: "#{install_dir}/embedded/bin" }
+        vars: { embedded_bin: "#{install_dir}/embedded/bin", project_name: project.name }
 
     # This is the real thing
     erb source: "hdeploy-ctl.rb.erb",
-        dest: "#{install_dir}/embedded/bin/hdeploy-ctl.rb",
+        dest: "#{install_dir}/embedded/bin/#{project.name}-ctl.rb",
         mode: 0755,
-        vars: { install_dir: install_dir }
+        vars: { install_dir: install_dir, project_name: project.name }
 
     # Align?
   end

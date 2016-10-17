@@ -1,4 +1,5 @@
 source 'https://rubygems.org'
+gem 'pry'
 
 # Install omnibus
 gem 'omnibus', '~> 5.5'
@@ -14,7 +15,7 @@ gem "omnibus-software", github: "hdeploy/omnibus-software", branch: "lcg/ruby23"
 # by running `bundle install --without development` to speed up build times.
 group :development do
   # Use Berkshelf for resolving cookbook dependencies
-  gem 'berkshelf', '~> 4'
+  gem 'berkshelf', '~> 3.3'
 
   # Use Test Kitchen with Vagrant for converging the build environment
   gem 'test-kitchen',    '~> 1.4'

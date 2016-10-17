@@ -75,7 +75,15 @@ end
 
 def configure
   # This just means run chef
-  system "<%= install_dir %>/embedded/bin/chef-solo -c <%= install_dir %>/embedded/cookbooks/solo.rb -o hdeploy::_embedded_client"
+  run_list = (ARGV[1] or 'hdeploy::_embedded_<%= project_name == 'hdeploy' ? 'client' : 'server' %>')
+
+  if run_list.include? '_embedded'
+    config_file = 'embedded_chef.rb'
+  else
+    config_file = 'zero_chef.rb'
+  end
+
+  system "<%= install_dir %>/embedded/bin/chef-client -z -c <%= install_dir %>/embedded/cookbooks/#{config_file} -o #{run_list}"
 end
 
 def help

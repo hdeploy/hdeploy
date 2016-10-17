@@ -1,0 +1,6 @@
+source 'https://rubygems.org'
+
+gem 'sinatra', '~> 1.4.7'
+gem 'cassandra-driver', '~> 3.0.3'
+gem 'hdeploy', '~> 0.1.1'
+gem 'json', '~> 1.8.3'
