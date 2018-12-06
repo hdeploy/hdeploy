@@ -5,12 +5,12 @@ require 'pathname'
 require 'inifile'
 
 module HDeploy
-  class Client
+  class Node
 
     def initialize
       @conf = HDeploy::Conf.instance #FIXME search for the configuration at the right place
       @conf.add_defaults({
-        'client' => {
+        'node' => {
           'keepalive_delay' => 60,
           'check_deploy_delay' => 60,
           'max_run_duration' => 3600,
@@ -21,13 +21,13 @@ module HDeploy
       # Check for needed configuration parameters
       # API
       api_params = %w[http_user http_password endpoint]
-      raise "#{@conf.file}: you need 'api' section for hdeploy client (#{api_params.join(', ')})" unless @conf['api']
+      raise "#{@conf.file}: you need 'api' section for hdeploy node (#{api_params.join(', ')})" unless @conf['api']
       api_params.each do |p|
-        raise "#{@conf.file}: you need param for hdeploy client: api/#{p}" unless @conf['api'][p]
+        raise "#{@conf.file}: you need param for hdeploy node: api/#{p}" unless @conf['api'][p]
       end
 
       # Deploy
-      raise "#{@conf.file}: you need 'deploy' section for hdeploy client" unless @conf['deploy']
+      raise "#{@conf.file}: you need 'deploy' section for hdeploy node" unless @conf['deploy']
       @conf['deploy'].keys.each do |k|
         raise "#{@conf.file}: deploy key must be in the format app:env - found #{k}" unless k =~ /^[a-z0-9\-\_]+:[a-z0-9\-\_]+$/
       end
@@ -50,23 +50,52 @@ module HDeploy
         end
 
         # It's not a mistake to check for uid in the gid section: only root can change gid.
-        raise "You must run client as uid root if you want a different user for deploy #{k}" if Process.uid != 0 and c['user'] != Process.uid
-        raise "You must run client as gid root if you want a different group for deploy #{k}" if Process.uid != 0 and c['group'] != Process.gid
+        # FIXME: syntax errors, check for user, blah blah
+        uid = (c['user'].is_a? Integer)  ? c['user']  : Etc.getpwnam(c['user']).uid
+        gid = (c['group'].is_a? Integer) ? c['group'] : Etc.getgrnam(c['group']).gid
+
+        raise "You must run hdeploy node as uid root if you want a different user for deploy #{k}" if Process.uid != 0 and uid != Process.uid
+        raise "You must run hdeploy node as gid root if you want a different group for deploy #{k}" if Process.uid != 0 and gid != Process.gid
       end
     end
 
     # -------------------------------------------------------------------------
+    def run
+      # Performance: require here so that launching other stuff doesn't load the library
+      require 'eventmachine'
+
+      # FIXME: add defaults
+
+      EM.run do
+        repeat_action('/usr/local/bin/hdeploy_node keepalive',   @conf['node']['keepalive_delay'].to_i,0)
+        repeat_action('/usr/local/bin/hdeploy_node check_deploy',@conf['node']['check_deploy_delay'].to_i,100)
+        EM.add_timer(@conf['node']['max_run_duration'].to_i) do
+          puts "has run long enough"
+          EM.stop
+        end
+      end
+    end
+
+    def repeat_action(cmd,delay,splay=0)
+      EM.system(cmd,proc do |output,status|
+        puts "CMD END: #{cmd} #{status} #{output.strip}"
+        EM.add_timer(((status.success?) ? delay+rand(splay+1) : 5),proc{repeat_action(cmd,delay,splay)})
+      end
+      )
+    end
+
+    # -------------------------------------------------------------------------
     def keepalive
-      hostname = @conf['client']['hostname']
+      hostname = @conf['node']['hostname']
       c = Curl::Easy.new(@conf['api']['endpoint'] + '/srv/keepalive/' + hostname)
       c.http_auth_types = :basic
       c.username = @conf['api']['http_user']
       c.password = @conf['api']['http_password']
-      c.put((@conf['client']['keepalive_delay'].to_i * 2).to_s)
+      c.put((@conf['node']['keepalive_delay'].to_i * 2).to_s)
     end
 
     def put_state
-      hostname = @conf['client']['hostname']
+      hostname = @conf['node']['hostname']
 
       c = Curl::Easy.new(@conf['api']['endpoint'] + '/distribute_state/' + hostname)
       c.http_auth_types = :basic
@@ -109,6 +138,8 @@ module HDeploy
         /opt/hdeploy/bin
         /usr/local/bin
         /usr/bin
+        /sbin
+        /bin
       ].each do |p|
         e = File.join p,name
         next unless File.exists? e
@@ -171,13 +202,16 @@ module HDeploy
               # FIXME: don't run download as root!!
               #####
               if f = find_executable('aria2c')
+                puts("#{f} -x 5 -d #{tgzpath} -o #{artifact}.tar.gz #{artdata['source']}")
                 system("#{f} -x 5 -d #{tgzpath} -o #{artifact}.tar.gz #{artdata['source']}")
 
               elsif f = find_executable('wget')
-                system("#{f} -o #{tgzfile} #{artdata['source']}")
+                puts("#{f} -O #{tgzfile} #{artdata['source']}")
+                system("#{f} -O #{tgzfile} #{artdata['source']}")
 
               elsif f = find_executable('curl')
-                system("#{f} -o #{tgzfile} #{artdata['source']}")                
+                puts("#{f} -o #{tgzfile} #{artdata['source']}")
+                system("#{f} -o #{tgzfile} #{artdata['source']}")
 
               else
                 raise "no aria2c, wget or curl available. please install one of them."
@@ -185,8 +219,9 @@ module HDeploy
             end
 
             raise "unable to download artifact" unless File.exists?tgzfile
-            raise "incorrect checksum for #{tgzfile}" unless Digest::MD5.file(tgzfile) == artdata['checksum']
 
+            calcdigest = Digest::MD5.file(tgzfile)
+            raise "incorrect checksum for #{tgzfile} (got #{calcdigest} expected #{artdata['checksum']}" unless calcdigest == artdata['checksum']
 
             FileUtils.mkdir_p destdir
             FileUtils.chown user, group, destdir
@@ -209,11 +244,11 @@ module HDeploy
 
           # we only get here if previous step worked.
           tgz_to_keep << File.expand_path(tgzfile)
-          dir_to_keep << File.expand_path(destdir)            
+          dir_to_keep << File.expand_path(destdir)
         end
 
-        # check for symlink
-        symlink({'app' => app,'env' => env, 'force' => false})
+        # Should we symlink? Passing the artifacts as 'probe'
+        symlink({'app' => app,'env' => env, 'force' => false, 'probe' => artifacts})
 
         # cleanup
         if Dir.exists? conf['symlink']
@@ -235,7 +270,7 @@ module HDeploy
     end
 
     def run_hook(hook,params)
-      # This is a generic function to run the hooks defined in hdeploy.ini.
+      # This is a generic function to run the hooks defined in hdeploy.json.
       # Standard hooks are
 
       app,env,artifact = params.values_at('app','env','artifact')
@@ -247,19 +282,14 @@ module HDeploy
       relpath,user,group = @conf['deploy']["#{app}:#{env}"].values_at('relpath','user','group')
       destdir = File.join relpath,artifact
 
-      # It's OK if the file doesn't exist
-      hdeployini = File.join destdir, 'hdeploy.ini'
-      return unless File.exists? hdeployini
+      hookfile = File.join destdir, 'hdeploy', "#{hook}.sh"
 
-      # It's also OK if that hook doesn't exist
-      hdc = IniFile.load(hdeployini)['hooks']
-      return unless hdc.has_key? hook
-
-      hfile = hdc[hook]
-
-      # But if it is defined, we're gonna scream if it's defined incorrectly.
-      raise "no such file #{hfile} for hook #{hook}" unless File.exists? (File.join destdir,hfile)
-      raise "non-executable file #{hfile} for hook #{hook}" unless File.executable? (File.join destdir,hfile)
+      if File.exists? hookfile
+        raise "non-executable file #{hookfile} for hook #{hook}" unless File.executable?(hookfile)
+      else
+        puts "No hook file for #{hook} (look for #{hookfile} - doing nothing"
+        return
+      end
 
       # OK let's run the hook
       Dir.chdir destdir
@@ -270,50 +300,107 @@ module HDeploy
         chpst += " -u #{user}:#{group} "
       end
 
-      system("#{chpst}#{hfile} '#{JSON.generate(params)}'")
+      system("#{chpst}#{hookfile} '#{JSON.generate(params)}'")
       if $?.success?
-        puts "Successfully run #{hook} hook / #{hfile}"
+        puts "Successfully run #{hook} hook / #{hookfile}"
         Dir.chdir oldpwd
       else
         Dir.chdir oldpwd
-        raise "Error while running file #{hfile} hook #{hook} : #{$?} - (DEBUG: (pwd: #{destdir}): #{chpst}#{hfile} '#{JSON.generate(params)}'"
+        raise "Error while running file #{hookfile} hook #{hook} : #{$?} - (DEBUG: (pwd: #{destdir}): #{chpst}#{hookfile} '#{JSON.generate(params)}'"
       end
     end
 
     def symlink(params)
-
-      app,env = params.values_at('app','env')
-      force = true
-      if params.has_key? 'force'
-        force = params['force']
-      end
+      # NOTE: the probe data is the value of a /distribute/app/env query
+      # Not just true/false
+      app,env,force,probe = params.values_at('app','env','force','probe')
+      force = false if force.nil?
+      probe = false if probe.nil?
 
       raise "no such app/env #{app} / #{env}" unless @conf['deploy'].has_key? "#{app}:#{env}"
 
       conf = @conf['deploy']["#{app}:#{env}"]
       link,relpath = conf.values_at('symlink','relpath')
 
+      target = false
+      current_link_is_correct = false
+
+      if probe
+        # Probe contains the target so no need to do an extra query
+        target = probe.select{|k,v| v['target']}
+        if target.count == 1
+          target = target.keys.first
+        else
+          # No target
+          puts "No target for #{app}/#{env} currently set - doing nothing"
+          return
+        end
+      else
+        if force or !(File.exists?link)
+          # We're not probing but we still wanna check things
+          c = Curl::Easy.new(@conf['api']['endpoint'] + '/target/' + app + '/' + env)
+          c.http_auth_types = :basic
+          c.username = @conf['api']['http_user']
+          c.password = @conf['api']['http_password']
+          c.perform
+          target = c.body_str
+
+          if target == "unknown"
+            puts "No target for #{app}/#{env} current set - doing nothing"
+            return
+          end
+        else
+          puts "No force and there's already a file on #{link} - doing nothing"
+          return
+        end
+      end
+
+      # We got here in the code - it means that we do have a target
+      target_relative_path = Pathname.new(File.join relpath,target).relative_path_from(Pathname.new(File.join(link,'..'))).to_s
+      if File.symlink?(link) and (File.readlink(link) == target_relative_path)
+        puts "Symlink for app #{app} is already OK (#{target_relative_path}"
+        return
+      else
+        # This is where we decide to maybe do something
+        if probe and !force # force always decides to do something
+          c = Curl::Easy.new(@conf['api']['endpoint'] + '/target_state/' + app + '/' + env)
+          c.http_auth_types = :basic
+          c.username = @conf['api']['http_user']
+          c.password = @conf['api']['http_password']
+          c.perform
+          target_state = JSON.parse(c.body_str)
+
+          if target_state.count == 0
+            puts "No current state for #{app}/#{env} - nothing to check against"
+          else
+            # Let's continue
+          # Now we count which has what
+            counts = {}
+            target_state.each do |data|
+              counts[data['current']] ||= 0
+              counts[data['current']] += 1
+            end
+
+            # Sort by number then alphabetical - and get the artifact name
+            majority_state_target,majority_state_count = counts.sort_by{|c| [ c.last, c.first ]}.last
+            if majority_state_count >= (target_state.count.to_f / 2).ceil.to_i and majority_state_target == target
+              puts "The majority of other servers have the current target for #{app}/#{env} - setting - setting distribute force for myself"
+              force = true
+            else
+              puts "The target is different from current state but most servers haven't upgraded to it (yet?) - assuming force symlink hasn't been run"
+            end
+          end
+        end
+      end
+
       if force or !(File.exists?link)
         FileUtils.rm_rf(link) unless File.symlink?link
 
-        c = Curl::Easy.new(@conf['api']['endpoint'] + '/target/' + app + '/' + env)
-        c.http_auth_types = :basic
-        c.username = @conf['api']['http_user']
-        c.password = @conf['api']['http_password']
-        c.perform
-
-        target = c.body_str
-        target_relative_path = Pathname.new(File.join relpath,target).relative_path_from(Pathname.new(File.join(link,'..')))
-
-        if File.symlink?(link) and (File.readlink(link) == target_relative_path)
-          puts "symlink for app #{app} is already OK (#{target_relative_path})"
-        else
-          # atomic symlink override
-          puts "setting symlink for app #{app} to #{target_relative_path}"
-          File.symlink(target_relative_path,link + '.tmp') #FIXME: should this belong to root?
-          File.rename(link + '.tmp', link)
-          put_state
-        end
+        # atomic symlink override
+        puts "setting symlink for app #{app} to #{target_relative_path}"
+        File.symlink(target_relative_path,link + '.tmp') #FIXME: should this belong to root?
+        File.rename(link + '.tmp', link)
+        put_state
 
         run_hook('post_symlink', {'app' => app, 'env' => env, 'artifact' => target})
       else

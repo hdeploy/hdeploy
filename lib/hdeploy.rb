@@ -1,6 +1,6 @@
 require 'hdeploy/conf'
 require 'hdeploy/cli'
-require 'hdeploy/client'
+require 'hdeploy/node'
 require 'hdeploy/apiclient'
 
 module HDeploy

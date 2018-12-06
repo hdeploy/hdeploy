@@ -11,10 +11,9 @@ module HDeploy
     attr_reader :file
 
     def initialize(file)
-
+      
       # this is for omnibus and such
       # not very elegant but it works...
-      # FIXME: add some other seach paths.
       if file.nil?
         f = __FILE__
         if f.start_with? '/opt/hdeploy/'
@@ -36,32 +35,25 @@ module HDeploy
     end
 
     # -------------------------------------------------------------------------
+
     def reload
       raise "unable to find conf file #{@file}" unless File.exists? @file
-
+      
       st = File.stat(@file)
       raise "config file #{@file} must not be a symlink" if File.symlink?(@file)
       raise "config file #{@file} must be a regular file" unless st.file?
       raise "config file #{@file} must have uid 0" unless st.uid == 0 or Process.uid != 0
       raise "config file #{@file} must not allow group/others to write" unless sprintf("%o", st.mode) =~ /^100[46][04][04]/
-
+      
       # Seems we have checked everything. Woohoo!
       @conf = JSON.parse(File.read(@file))
     end
 
     # -------------------------------------------------------------------------
     def [](k)
-      @conf[k] || {} # FIXME: autovivification?
+      @conf[k] 
     end
-
-    def each(&block)
-      @conf.each(&block)
-    end
-
-    def keys
-      @conf.keys
-    end
-
+    
     # -------------------------------------------------------------------------
     def add_defaults(h)
       # This is pretty crappy code in that it loads stuff twice etc. But that way no re-implementing a variation of deep_merge for default stuff...

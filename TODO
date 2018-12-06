@@ -1,0 +1,30 @@
+HDEPLOY
+> make it compatible with MySQL
+
+> make demo
+>> must be from scratch: servers with just a chef recipe
+>> must be some random app
+>> must be 
+>> must use MySQL as a registry
+
+TODO:
+- add a MySQL / Cassandra option to hdeploy
+- create / adapt chef recipes for HDeploy (client and server)
+
+
+
+
+Building a test environment
+
+1/ install MySQL database
+2/ have some kind of code to deploy
+3/ have some kind of config for the code (chef?)
+   >> installs daemon
+   >>
+4/ install and run API
+5/ 
+
+make it ready for demo: add some special exceptions for the deploy to self (don't use fab?)
+add options for not using sudo
+add options for using bundler on remote server
+

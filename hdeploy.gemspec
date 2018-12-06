@@ -17,9 +17,11 @@ Gem::Specification.new do |s|
 
   s.add_runtime_dependency 'json',    '>= 1.7', '< 2.0.0'
   s.add_runtime_dependency 'curb',    '~> 0.8'
-  s.add_runtime_dependency 'inifile',   '~> 2.0'  
+  s.add_runtime_dependency 'inifile',   '~> 2.0'
   s.add_runtime_dependency 'deep_clone', '~> 0.0' # For configuration
   s.add_runtime_dependency 'deep_merge', '~> 1.1'
-
-  s.add_development_dependency 'pry', '~> 0'
+  s.add_runtime_dependency 'rb-readline', '> 0'
+  s.add_runtime_dependency 'pry', '> 0'
+  s.add_runtime_dependency 'sinatra', '~> 2.0.3'
+  s.add_runtime_dependency 'eventmachine', '~> 1.2.5'
 end

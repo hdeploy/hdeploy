@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+require 'hdeploy'
+require 'pry'
+
+db = HDeploy::Database.factory
+
+binding.pry
+
+#cass.execute("")
+
+exit
+

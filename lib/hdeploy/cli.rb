@@ -8,8 +8,30 @@ module HDeploy
   class CLI
 
     def initialize
-      @config = HDeploy::Conf.instance
+      @conf = HDeploy::Conf.instance
       @client = HDeploy::APIClient.instance
+
+      @conf['cli'] ||= {}
+
+      cli_defaults = {
+        'default_env' => 'dev',
+        'default_app' => 'demoapp',
+        'domain_name' => nil,
+      }
+
+      if File.file? '/etc/resolv.conf'
+        domain_name = File.readlines('/etc/resolv.conf').select{|line| line =~ /^domain /}
+        if domain_name.count == 1
+          if domain_name.first =~ /^domain_name[\s\t]+([a-z0-9\.\-]+)/
+            cli_defaults['domain_name'] = $1
+          end
+        end
+      end
+
+      cli_defaults.each do |k,v|
+        @conf['cli'][k] ||= v
+      end
+
       @domain_name = @conf['cli']['domain_name']
       @app = @conf['cli']['default_app']
       @env = @conf['cli']['default_env']
@@ -23,6 +45,7 @@ module HDeploy
           @conf[k][k2] = File.expand_path(v) if k2 =~ /\_path$/
         end
       end
+
     end
 
     def run!
@@ -107,7 +130,7 @@ module HDeploy
       keepnum = c['prune'] || 5
       keepnum = keepnum.to_i
 
-      artdir = c['artifacts']
+      artdir = c['artifact_dir']
 
       artlist = []
       Dir.entries(artdir).sort.each do |f|
@@ -135,7 +158,7 @@ module HDeploy
     end
 
     def prune_build_env
-      c = @conf[@app]
+      c = @conf['build'][@app] #FIXME: error if the app doesn't exist
       keepnum = c['prune_build_env'] || 2
       keepnum = keepnum.to_i
 
@@ -153,7 +176,7 @@ module HDeploy
     end
 
     def prune(prune_env='nowhere')
-
+      _conf_fill_defaults
       c = @conf['build'][@app]
       prune_count = c['prune'].to_i #FIXME: integrity check.
       raise "no proper prune count" unless prune_count >= 3 and prune_count < 20
@@ -171,7 +194,7 @@ module HDeploy
           if prune_env == 'nowhere'
             # We take EVERYTHING into account
             artifacts_to_keep[dist_state['current']] = true
-            dist_state['artifacts'].each do |art|
+            dist_state['artifact_dir'].each do |art|
               artifacts_to_keep[art] = true
             end
 
@@ -253,6 +276,8 @@ module HDeploy
 
       # now that we have a servers by env, we can tell for each artifact what is distributed for it, and where it's missing.
 
+      dist['nowhere'] ||= []
+
       ret = "---------------------------------------------------\n" +
             "Artifact distribution state for app #{@app}\n" +
             "---------------------------------------------------\n\n"
@@ -265,6 +290,7 @@ module HDeploy
       end
 
       todisplay.each do |env,artifacts|
+        servers_by_env[env] ||= {}
         srvnum = servers_by_env[env].length
         txt = "ENV \"#{env}\" (#{srvnum} servers)\n"
         ret += ("-" * txt.length) + "\n" + txt + ("-" * txt.length) + "\n"
@@ -272,14 +298,15 @@ module HDeploy
 
         # Consistent targets?
         current_by_art = {}
-        inconsistent = []
+        non_target = []
+        current_links[env] ||= {}
         current_links[env].each do |srv,link|
-          inconsistent << srv if link != targets[env]
+          non_target << srv if link != targets[env]
           current_by_art[link] = [] unless current_by_art.has_key? link
           current_by_art[link] << srv
         end
-        if inconsistent.length > 0
-          ret += " (#{inconsistent.length}/#{servers_by_env[env].length} inconsistent servers: #{inconsistent.join(', ')})\n\n"
+        if non_target.length > 0
+          ret += " (#{non_target.length}/#{servers_by_env[env].length} servers not set to symlink target: #{non_target.join(', ')})\n\n"
         else
           ret += " (All OK)\n\n"
         end
@@ -319,13 +346,17 @@ module HDeploy
 
     def help
       puts "Possible commands:"
-      puts "  env:branch"
       puts "  build (or build:branch)"
-      puts "  app:appname"
       puts "  distribute:nameofartifact"
+      puts "  undistribute:nameofartifact"
       puts "  symlink:nameofartifact"
-      puts "  list"
-      puts ""
+      puts "  fulldeploy:nameofartifact (combines distribute and symlink)"
+      puts "  state"
+      puts
+      puts "option commands:"
+      puts "  env:someenv"
+      puts "  app:appname"
+      puts
       puts "Example: hdeploy env:production build"
     end
 
@@ -338,39 +369,79 @@ module HDeploy
     end
 
     def init
+      _conf_fill_defaults
       c = @conf['build'][@app]
-      repo = File.expand_path(c['repo'])
+      repo_dir = File.expand_path(c['repo_dir'])
 
-      if !(Dir.exists?(File.join(repo,'.git')))
-        FileUtils.rm_rf repo
-        FileUtils.mkdir_p File.join(repo,'..')
-        mysystem("git clone #{c['git']} #{repo}")
+      if !(Dir.exists?(File.join(repo_dir,'.git')))
+        FileUtils.rm_rf repo_dir
+        FileUtils.mkdir_p File.join(repo_dir,'..')
+        mysystem("git clone #{c['git']} #{repo_dir}")
       end
     end
 
     def notify(msg)
+      puts "Notification: #{msg}"
       if File.executable?('/usr/local/bin/hdeploy_hipchat')
         mysystem("/usr/local/bin/hdeploy_hipchat #{msg}")
       end
     end
 
-    def build(branch = 'master')
+    def _hostmonkeypatch
+      if @domain_name
+        "host_monkeypatch:#{@domain_name} "
+      else
+        ''
+      end
+    end
 
+    def _fab
+      #FIXME: fabfile ie fab -f $(hdeploy_fabfile)"
+      #FIXME: ensure this is Fabric 1.x
+      #COmmand: pip install 'fabric<2.0'
+      "fab" #FIXME: seach for binary?
+    end
+
+    def _conf_fill_defaults
+      c = @conf['build']
+
+      c['_default'] ||= {}
+      {
+        'build_dir' => '~/hdeploy_build/build/%s',
+        'repo_dir' => '~/hdeploy_build/repos/%s',
+        'artifact_dir' => '~/hdeploy_build/artifacts/%s',
+        'artifact_url' => @conf['api']['endpoint'] + '/demo_only_repo/%s',
+        'prune' => 5,
+      }.each do |k,v|
+        c['_default'][k] ||= v
+      end
+
+      c.each do |app,aconf|
+        next if app == '_default'
+        c['_default'].each do |k,v|
+          aconf[k] ||= sprintf(v.to_s,app)
+        end
+      end
+    end
+
+    def build(branch = 'master')
+      _conf_fill_defaults
       prune_build_env
 
       # Starting now..
       start_time = Time.new
 
       # Copy GIT directory
-      c = @conf['build'][@app]
-      repo = File.expand_path(c['repo'])
+      c = @conf['build'][@app] # FIXME: sane defaults for artifacts directory
+      c['artifact_dir'] = File.expand_path(c['artifact_dir'])
+      repo_dir = File.expand_path(c['repo_dir'])
 
-      raise "Error in source dir #{repo}. Please run hdeploy initrepo" unless Dir.exists? (File.join(repo, '.git'))
+      raise "Error in source dir #{repo_dir}. Please run hdeploy initrepo" unless Dir.exists? (File.join(repo_dir, '.git'))
       directory = File.expand_path(File.join(c['build_dir'], (@app + start_time.strftime('.%Y%m%d_%H_%M_%S.'))) + ENV['USER'] + (@fakebuild? '.fakebuild' : ''))
       FileUtils.mkdir_p directory
 
       # Update GIT directory
-      Dir.chdir(repo)
+      Dir.chdir(repo_dir)
 
       subgit  = `find . -mindepth 2 -name .git -type d`
       if subgit.length > 0
@@ -408,10 +479,10 @@ module HDeploy
 
 
       # Copy GIT
-      if c['subdir'].empty?
-        mysystem "rsync -av --exclude=.git #{c['repo']}/ #{directory}/"
+      if c.key?'subdir' # FIXME: error msg, existence, doc, etc.
+        mysystem "rsync -av --exclude=.git #{c['repo_dir']}/ #{directory}/"
       else
-        mysystem "rsync -av --exclude=.git #{c['repo']}/c['subdir']/ #{directory}/"
+        mysystem "rsync -av --exclude=.git #{c['repo_dir']}/#{c['subdir']}/ #{directory}/"
       end
 
       # Get a tag
@@ -426,9 +497,9 @@ module HDeploy
       File.write 'REVISION', (gitrev + "\n")
 
       # Run the build process # FIXME: add sanity check
-      try_files = %w[build.sh build/build.sh hdeploy/build.sh]
+      try_files = %w[./build.sh build/build.sh hdeploy/build.sh]
       if File.exists? 'hdeploy.ini'
-        repoconf = IniFile.load('hdeploy.ini')['global']
+        repoconf = JSON.parse(File.read('hdeploy.json'))['global']
         try_files.unshift(repoconf['build_script']) if repoconf['build_script']
       end
 
@@ -446,8 +517,8 @@ module HDeploy
       end
 
       # Make tarball
-      FileUtils.mkdir_p c['artifacts']
-      mysystem("tar czf #{File.join(c['artifacts'],build_tag)}.tar.gz .")
+      FileUtils.mkdir_p c['artifact_dir'] #FIXME: check for existence of artifacts
+      mysystem("tar czf #{File.join(c['artifact_dir'],build_tag)}.tar.gz .")
 
       # FIXME: upload to S3
       register_tarball(build_tag)
@@ -456,14 +527,14 @@ module HDeploy
 
       prune_build_env
     end
-    
+
     def register_tarball(build_tag)
       # Register tarball
       filename = build_tag + '.tar.gz'
-      checksum = Digest::MD5.file(File.join(@conf['build'][@app]['artifacts'], filename))
+      checksum = Digest::MD5.file(File.join(@conf['build'][@app]['artifact_dir'], filename))
 
       @client.put("/artifact/#{@app}/#{build_tag}", JSON.pretty_generate({
-        source: "http://build.gyg.io:8502/#{filename}",
+        source: @conf['build'][@app]['artifact_url'] + "/#{filename}",
         altsource: "",
         checksum: checksum,
       }))
@@ -479,12 +550,16 @@ module HDeploy
       if r =~ /^OK /
         h = JSON.parse(@client.get("/srv/by_app/#{@app}/#{@env}"))
 
+        if h.count == 0
+          raise "Currently, no servers in env '#{@env}' that are ready for app '#{@app}' - but if you add some they will get the code..."
+        end
+
         # On all servers, do a standard check deploy.
-        system("#{_fab} -f $(hdeploy_filepath fabfile.py) -H #{h.keys.join(',')} -P host_monkeypatch:#{@domain_name} -- sudo hdeploy_node check_deploy")
+        system("#{_fab} -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- sudo hdeploy_node check_deploy")
 
         # And on a single server, run the single hook.
         hookparams = { app: @app, env: @env, artifact: build_tag, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-        system("#{_fab} -f $(hdeploy_filepath fabfile.py) -H #{h.keys.sample} -P host_monkeypatch:#{@domain_name} -- 'echo #{hookparams} | sudo hdeploy_node post_distribute_run_once'")
+        system("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo hdeploy_node post_distribute_run_once'")
       end
     end
 
@@ -495,7 +570,7 @@ module HDeploy
       # for the actual presence we will only check in the symlink part.
 
       todist = JSON.parse(@client.get("/distribute/#{@app}/#{@env}"))
-      raise "artifact #{artid} is not set to be distributed for #{@app}/#{@env}" unless todist.has_key? artid
+      raise "artifact #{artid} is not set to be distributed for #{@app}/#{@env} - please choose in this list: #{todist.keys}" unless todist.has_key? artid
       return @client.put("/target/#{@app}/#{@env}", artid)
     end
 
@@ -512,11 +587,11 @@ module HDeploy
       end
 
       # On all servers, do a standard symlink
-      system("#{_fab} -f $(hdeploy_filepath fabfile.py) -H #{h.keys.join(',')} -P host_monkeypatch:#{@domain_name} -- 'echo app:#{@app} env:#{@env} | sudo hdeploy_node symlink'")
+      system("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo hdeploy_node symlink'")
 
       # And on a single server, run the single hook.
       hookparams = { app: @app, env: @env, artifact: target, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-      system("#{_fab} -f $(hdeploy_filepath fabfile.py) -H #{h.keys.sample} -P host_monkeypatch:#{@domain_name} -- 'echo #{hookparams} | sudo hdeploy_node post_symlink_run_once'")
+      system("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo hdeploy_node post_symlink_run_once'")
     end
   end
 end

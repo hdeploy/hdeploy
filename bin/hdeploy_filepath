@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
 
 require 'hdeploy'
-
-cli = HDeploy::CLI.new
-cli.run!
+puts HDeploy::where_is(ARGV.first)
 
