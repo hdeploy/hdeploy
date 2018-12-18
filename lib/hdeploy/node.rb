@@ -18,6 +18,11 @@ module HDeploy
         }
       })
 
+      # eliminate training slash
+      if @conf['api']['endpoint'].end_with? '/'
+        @conf['api']['endpoint'].chop!
+      end
+
       # Check for needed configuration parameters
       # API
       api_params = %w[http_user http_password endpoint]
