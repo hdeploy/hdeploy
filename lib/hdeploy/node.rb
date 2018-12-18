@@ -45,6 +45,7 @@ module HDeploy
           'tgzpath' => File.expand_path('../tarballs', c['symlink']),
           'user' => default_user,
           'group' => default_group,
+          'quorum_force_deploy' => true,
         }.each do |k2,v|
           c[k2] ||= v
         end
@@ -169,7 +170,7 @@ module HDeploy
 
         # Here we get the info.
         # FIXME: double check that config is ok
-        relpath,tgzpath,symlink,user,group = conf.values_at('relpath','tgzpath','symlink','user','group')
+        relpath,tgzpath,symlink,user,group,quorum_force_deploy = conf.values_at('relpath','tgzpath','symlink','user','group','quorum_force_deploy')
 
         # Now the release info from the server
         c.url = @conf['api']['endpoint'] + '/distribute/' + app + '/' + env
@@ -248,7 +249,7 @@ module HDeploy
         end
 
         # Should we symlink? Passing the artifacts as 'probe'
-        symlink({'app' => app,'env' => env, 'force' => false, 'probe' => artifacts})
+        symlink({'app' => app,'env' => env, 'force' => false, 'quorum_force_deploy' => quorum_force_deploy, 'probe' => artifacts})
 
         # cleanup
         if Dir.exists? conf['symlink']
@@ -313,9 +314,9 @@ module HDeploy
     def symlink(params)
       # NOTE: the probe data is the value of a /distribute/app/env query
       # Not just true/false
-      app,env,force,probe = params.values_at('app','env','force','probe')
+      app,env,force,quorum_force_deploy,probe = params.values_at('app','env','force','quorum_force_deploy','probe')
       force = false if force.nil?
-      probe = false if probe.nil?
+      quorum_force_deploy = false if quorum_force_deploy.nil?
 
       raise "no such app/env #{app} / #{env}" unless @conf['deploy'].has_key? "#{app}:#{env}"
 
@@ -325,7 +326,7 @@ module HDeploy
       target = false
       current_link_is_correct = false
 
-      if probe
+      if quorum_force_deploy
         # Probe contains the target so no need to do an extra query
         target = probe.select{|k,v| v['target']}
         if target.count == 1
@@ -362,7 +363,7 @@ module HDeploy
         return
       else
         # This is where we decide to maybe do something
-        if probe and !force # force always decides to do something
+        if quorum_force_deploy and !force # force always decides to do something
           c = Curl::Easy.new(@conf['api']['endpoint'] + '/target_state/' + app + '/' + env)
           c.http_auth_types = :basic
           c.username = @conf['api']['http_user']
@@ -375,19 +376,19 @@ module HDeploy
           else
             # Let's continue
           # Now we count which has what
-            counts = {}
+            current_state_counts = {}
             target_state.each do |data|
-              counts[data['current']] ||= 0
-              counts[data['current']] += 1
+              current_state_counts[data['current']] ||= 0
+              current_state_counts[data['current']] += 1
             end
 
             # Sort by number then alphabetical - and get the artifact name
-            majority_state_target,majority_state_count = counts.sort_by{|c| [ c.last, c.first ]}.last
-            if majority_state_count >= (target_state.count.to_f / 2).ceil.to_i and majority_state_target == target
-              puts "The majority of other servers have the current target for #{app}/#{env} - setting - setting distribute force for myself"
+            quorum_state_target,quorum_state_count = current_state_counts.sort_by{|c| [ c.last, c.first ]}.last
+            if quorum_state_count >= (target_state.count.to_f / 2).ceil.to_i and quorum_state_target == target
+              puts "quorum_force_deploy: The majority of other servers have the current target for #{app}/#{env} - setting - setting distribute force for myself"
               force = true
             else
-              puts "The target is different from current state but most servers haven't upgraded to it (yet?) - assuming force symlink hasn't been run"
+              puts "quorum_force_deploy: The target is different from current state but most servers haven't upgraded to it (yet?) - assuming force symlink hasn't been run"
             end
           end
         end
