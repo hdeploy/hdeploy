@@ -10,8 +10,13 @@ module HDeploy
         puts "WARNING: do not use in production, you want Cassandra (distributed) or at least MySQL (concurrent queries) for production"
 
         @queries.merge!({
+          # These are special just because they expire
           put_keepalive: "INSERT INTO srv_keepalive (hostname,expire) VALUES(?,strftime('%s', datetime('now')) + ?)",
           put_distribute_state: "INSERT INTO distribute_state (app,env,hostname,current,artifacts,expire) VALUES(?,?,?,?,?,strftime('%s', datetime('now')) + 1800)",
+
+          # Special stuff for SQLite expiration
+          expire_distribute_state: "DELETE FROM distribute_state WHERE expire < strftime('%s', datetime('now'))",
+          expire_keepalive: "DELETE FROM srv_keepalive WHERE expire < strftime('%s', datetime('now'))",
         })
 
         # FIXME: regular run of expire?
@@ -38,6 +43,8 @@ module HDeploy
             end
           end
         end
+
+        @cleanup_due = 0
       end
 
       def raw_query(sql)
@@ -49,6 +56,15 @@ module HDeploy
           statement = @db.prepare(@queries[m])
           args = adapt_args_to_sql_update(m, args)
           result = statement.execute(*args)
+
+          if @cleanup_due < Time.new.to_i
+            @cleanup_due = Time.new.to_i + 5 # Do it again in a minute
+            puts "DB Expire cleanup"
+            expire_distribute_state
+            puts "Distribute state: #{@db.changes} changes"
+            expire_keepalive
+            puts "Keepalive: #{@db.changes} changes"
+          end
         else
           raise "No such query/method #{m} in class HDeploy::Database::SQLite"
         end

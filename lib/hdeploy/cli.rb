@@ -37,6 +37,7 @@ module HDeploy
       @env = @conf['cli']['default_env']
       @force = false
       @fakebuild = false
+      @verbose = false
 
 
       @conf.each do |k|
@@ -328,7 +329,16 @@ module HDeploy
         ret += "\n"
       end
 
+      if @verbose
+        ret += "Server list\n"
+        ret += JSON.pretty_generate(servers_by_env.map{|k,v| [k, v.keys] }.to_h) + "\n"
+      end
+
       ret
+    end
+
+    def verbose
+      @verbose = true
     end
 
     def force
