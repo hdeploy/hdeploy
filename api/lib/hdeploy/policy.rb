@@ -10,6 +10,7 @@ def validatepolicy(policy)
   raise "Policy versions supported: #{supported_versions.keys.sort}" unless supported_versions.key? policy['Version']
   raise "Statement much be an Array" unless policy['Statement'].is_a? Array
   send(supported_versions[policy['Version']], policy['Statement'])
+  policy
 end
 
 def validatepolicy20181218(policy)
@@ -52,6 +53,26 @@ def validatepolicy20181218(policy)
       raise "#{e} - while evaluating policy statement #{statement} / ##{index}"
     end
   end
+  policy
 end
 
-validatepolicy(JSON.parse(File.read('policy.json')))
+def match_acl(matcher, tomatch)
+  matcher = [ matcher ] if matcher.is_a? String
+
+end
+
+def process_acl(action,resource,policy)
+  policy['Statement'].each do |statement|
+    sid,effect,p_action,p_resource = statement.values_at('Sid','Effect','Action','Resource')
+
+    if (p_action.map{|a| File.fnmatch(a,action)}.include?(true)) and (p_resource.map{|r| File.fnmatch(r,resource)}.include?(true))
+      puts "Matched on sid #{sid}"
+      return (effect == "Allow")
+      break
+    end
+  end
+  puts "No match - denying"
+  return false
+end
+
+puts process_acl('DoStuff', 'blah:derp', validatepolicy(JSON.parse(File.read('policy.json'))))
