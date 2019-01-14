@@ -2,7 +2,7 @@
   "api": {
     "http_user": "demo",
     "http_password": "demo",
-    "endpoint" : "http://10.116.250.157:8080"
+    "endpoint" : "http://10.116.250.131:8080"
   },
   "cli": {
     "default_app": "demoapp",

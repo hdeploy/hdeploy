@@ -2,7 +2,9 @@ require 'sinatra/base'
 require 'json'
 require 'hdeploy/conf'
 require 'hdeploy/database'
-require 'hdeploy/policy'
+require 'bcrypt'
+
+#require 'hdeploy/policy'
 
 module HDeploy
   class API < Sinatra::Base
@@ -21,23 +23,48 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     # Some Auth stuff
-    def process_acl(method,app,env=nil)
-      raise "app must match /^[A-Za-z0-9\\-\\_]+$/" unless app =~ /^[A-Za-z0-9\-\_]+$/
+    # This processes Authentication and authorization
+
+    def authorized?(method, app, env=nil)
+      if method == 'PutDistributeState' # Special case
+        raise "srv must match /^[A-Za-z0-9\\-\\.]+$/" unless app =~ /^[A-Za-z0-9\-\.]+$/
+      else
+        raise "app must match /^[A-Za-z0-9\\-\\_]+$/" unless app =~ /^[A-Za-z0-9\-\_]+$/
+      end
       raise "env must match /^[A-Za-z0-9\\-\\_]+$/" unless env =~ /^[A-Za-z0-9\-\_]+$/ or env.nil?
 
+      puts "Process AAA #{method} app:#{app} env:#{env}"
+
+      # We do first authentication and then once we know who we are, we do authorization
+      auth = Rack::Auth::Basic::Request.new(request.env)
+      if auth.provided? and auth.basic?
+        user,pass = auth.credentials
+        # First search in local authorizations
+
+
+        # If not, search in LDAP
+
+      else
+        headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
+        halt(401, "Not autorized\n")
+      end
+
+      # So now we have a user and we have some groups, we need to look into policy config to know what is assigned to which user
+      # then later we actually run the policy against the user and their group
+
 
     end
 
-    def protected!
-      return if authorized?
-      headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
-      halt 401, "Not authorized\n"
-    end
+    #def #protected!
+    #  return if authorized?
+    #  headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
+    #  halt 401, "Not authorized\n"
+    #end
 
-    def authorized?
-      @auth ||=  Rack::Auth::Basic::Request.new(request.env)
-      @auth.provided? and @auth.basic? and @auth.credentials and @auth.credentials == @conf['api'].values_at('http_user','http_password')
-    end
+    #def authorized?
+    #  @auth ||=  Rack::Auth::Basic::Request.new(request.env)
+    #  @auth.provided? and @auth.basic? and @auth.credentials and @auth.credentials == @conf['api'].values_at('http_user','http_password')
+    #end
 
     get '/health' do
       #FIXME: query db?
@@ -52,7 +79,7 @@ module HDeploy
     put '/distribute_state/:hostname' do |hostname|
       #FIXME: these are SRV actions not user actions, not sure how to ACL them - might need a special treatment
       #FIXME: how can you only allow the servers to update their own IP or name or something??
-      #process_acl('PutDistributeState',hostname)
+      authorized?('PutDistributeState', hostname)
 
       data = JSON.parse(request.body.read)
       #FIXME: very syntax of API call
@@ -70,9 +97,9 @@ module HDeploy
 
     put '/srv/keepalive/:hostname' do |hostname|
       #FIXME: these are SRV functions - not sure how to ACL them
-      #process_acl('PutSrvKeepalive', hostname)
+      #authorized?('PutSrvKeepalive', hostname)
 
-      protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
+      ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
       ttl = request.body.read.force_encoding('US-ASCII') || '20'
       @db.put_keepalive(hostname,ttl)
       "OK - Updated server #{hostname}"
@@ -81,8 +108,8 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     put '/artifact/:app/:artifact' do |app,artifact|
-      process_acl('PutArtifact', app)
-      protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
+      authorized?('PutArtifact', app)
+      ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
 
       data = request.body.read
       data = JSON.parse(data)
@@ -93,7 +120,7 @@ module HDeploy
     end
 
     delete '/artifact/:app/:artifact' do |app,artifact|
-      process_acl('DeleteArtifact', app)
+      authorized?('DeleteArtifact', app)
 
       # FIXME: don't allow to delete a target artifact.
       # FIXME: add a doesn't exist warning?
@@ -104,7 +131,7 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     put '/target/:app/:myenv' do |app,myenv|
-      process_acl('PutTarget',app,myenv)
+      authorized?('PutTarget',app,myenv)
 
       #FIXME check that the target exists
       artifact = request.body.read.force_encoding('US-ASCII')
@@ -113,7 +140,7 @@ module HDeploy
     end
 
     get '/target/:app/:myenv' do |app,myenv|
-      process_acl('GetTarget',app,myenv)
+      authorized?('GetTarget',app,myenv)
 
       artifact = "unknown"
       @db.get_target_env(app,myenv).each do |row|
@@ -124,13 +151,13 @@ module HDeploy
     end
 
     get '/target/:app' do |app|
-      process_acl('GetTarget',app)
+      authorized?('GetTarget',app)
       JSON.pretty_generate(@db.get_target(app).map(&:values).to_h)
     end
 
     # -----------------------------------------------------------------------------
     get '/distribute/:app/:env' do |app,myenv|
-      process_acl('GetDistribute',app,myenv)
+      authorized?('GetDistribute',app,myenv)
 
       # NOTE: cassandra implementation uses active_env since it doesn't know how to do joins
       r = {}
@@ -148,7 +175,7 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     get '/distribute/:app' do |app|
-      process_acl('GetDistribute',app)
+      authorized?('GetDistribute',app)
 
       r = {}
 
@@ -163,7 +190,7 @@ module HDeploy
     # -----------------------------------------------------------------------------
     # This call is just a big dump. The client can handle the sorting / formatting.
     get '/target_state/:app/:env' do |app,env|
-      process_acl('GetTargetState',app,env)
+      authorized?('GetTargetState',app,env)
 
       r = []
       JSON.pretty_generate(@db.get_target_state(app,env))
@@ -172,7 +199,7 @@ module HDeploy
     # -----------------------------------------------------------------------------
     # This call is just a big dump. The client can handle the sorting / formatting.
     get '/distribute_state/:app' do |app|
-      process_acl('GetDistributeState',app)
+      authorized?('GetDistributeState',app)
 
       r = []
       @db.get_distribute_state(app).each do |row|
@@ -185,7 +212,7 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     get '/artifact/:app' do |app|
-      process_acl('GetArtifact', app)
+      authorized?('GetArtifact', app)
       r = {}
       @db.get_artifact_list(app).each do |row| # The reason it's like that is that we can get
         artifact = row.delete 'artifact'
@@ -197,7 +224,7 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     put '/distribute/:app/:env' do |app,env|
-      process_acl('PutDistribute',app,env)
+      authorized?('PutDistribute',app,env)
 
       artifact = request.body.read.force_encoding('US-ASCII')
 
@@ -210,14 +237,14 @@ module HDeploy
     end
 
     delete '/distribute/:app/:env/:artifact' do |app,env,artifact|
-      process_acl('DeleteDistribute',app,env)
+      authorized?('DeleteDistribute',app,env)
       @db.delete_distribute(app,env,artifact)
       "OK will not distribute artifact #{artifact} for app #{app} in environment #{env}"
     end
 
     # -----------------------------------------------------------------------------
     get '/srv/by_app/:app/:env' do |app,env|
-      process_acl('GetSrvByApp',app,env)
+      authorized?('GetSrvByApp',app,env)
       # this gets the list that SHOULD have things distributed to them...
       r = {}
       @db.get_srv_by_app_env(app,env).each do |row|

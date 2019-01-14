@@ -28,3 +28,6 @@ make it ready for demo: add some special exceptions for the deploy to self (don'
 add options for not using sudo
 add options for using bundler on remote server
 
+rolling restart
+run X script
+
