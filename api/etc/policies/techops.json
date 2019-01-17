@@ -2,10 +2,10 @@
   "Version": "2018-12-18",
   "Statement": [
     {
-      "Sid": "XML",
+      "Sid": "Full Allow",
       "Effect": "Allow",
       "Resource": "*:*",
-      "Action": "Do*"
+      "Action": "*"
     }
   ]
 }

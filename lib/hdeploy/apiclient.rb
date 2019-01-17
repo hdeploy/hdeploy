@@ -17,7 +17,7 @@ module HDeploy
     def get(url)
       @c.url = @conf['api']['endpoint'] + url
       @c.perform
-      raise "response code for #{url} was not 200 : #{@c.response_code}" unless @c.response_code == 200
+      raise "response code for #{url} was not 200 : #{@c.response_code} : #{@c.body_str[0..100]}" unless @c.response_code == 200
       return @c.body_str
     end
 

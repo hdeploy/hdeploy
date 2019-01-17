@@ -1,8 +1,8 @@
 {
   "api": {
-    "http_user": "demo",
-    "http_password": "demo",
-    "endpoint" : "http://10.116.250.131:8080"
+    "http_user": "pviet",
+    "http_password": "derp",
+    "endpoint" : "http://127.0.0.1:8080"
   },
   "cli": {
     "default_app": "demoapp",

@@ -2,7 +2,7 @@ require 'sinatra/base'
 require 'json'
 require 'hdeploy/conf'
 require 'hdeploy/database'
-require 'bcrypt'
+require 'hdeploy/policy'
 
 #require 'hdeploy/policy'
 
@@ -24,7 +24,6 @@ module HDeploy
     # -----------------------------------------------------------------------------
     # Some Auth stuff
     # This processes Authentication and authorization
-
     def authorized?(method, app, env=nil)
       if method == 'PutDistributeState' # Special case
         raise "srv must match /^[A-Za-z0-9\\-\\.]+$/" unless app =~ /^[A-Za-z0-9\-\.]+$/
@@ -40,13 +39,30 @@ module HDeploy
       if auth.provided? and auth.basic?
         user,pass = auth.credentials
         # First search in local authorizations
-
+        begin
+          user = HDeploy::User.search_local(user,pass) # This will raise an exception if the user exists but it's a wrong pw
+        rescue Exception => e
+          headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
+          halt(401, "Not authorized 1 #{e}\n")
+        end
 
         # If not, search in LDAP
+        # TODO
+        if user.nil? or user == false
+          headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
+          halt(401, "Not authorized 2\n")
+        end
+
+        # OK so in the variable user we have the current user with the loaded policies etc
+        if user.evaluate(method, "#{app}:#{env}")
+          # User was authorized
+        else
+          halt(403, "Not authorized to do this action")
+        end
 
       else
         headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
-        halt(401, "Not autorized\n")
+        halt(401, "Not authorized 3\n")
       end
 
       # So now we have a user and we have some groups, we need to look into policy config to know what is assigned to which user
