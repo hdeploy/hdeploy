@@ -12,7 +12,7 @@ module HDeploy
     @@cache = {}
 
     def self.raw_get(k)
-      @@cache[k]
+      @@cache[k][:obj]
     end
 
     def self.get_or_block(id, file,ttl = 86400)
@@ -52,6 +52,22 @@ module HDeploy
       @@cache.keys.select{|k| File.fnmatch(pattern,k)}.each do |k|
         @@cache.delete k
       end
+    end
+  end
+
+  class Groupdefs
+    def initialize(file)
+      reload(file)
+    end
+
+    def reload(file)
+      puts "New group defs - cleanup all user cache"
+      Cache.delete_pattern('user:*')
+      @data = JSON.parse(File.read(file))
+    end
+
+    def [](k)
+      @data[k]
     end
   end
 
@@ -171,9 +187,10 @@ module HDeploy
       Cache.get_or_block('groupdefs', group_file) do
         # If we reload this, we will invalidate ALL USERS cache
         # It's kinda brutal but it's not gonna happen all the time either ...
-        puts "New group defs - cleanup all user cache"
+        # So the use of this block is not to GET the group defs but rather force a rebuild on expire
+        puts "First time groupdefs load"
         Cache.delete_pattern('user:*')
-        JSON.parse(File.read(group_file))
+        Groupdefs.new(group_file)
       end
 
       file = File.join(CONFPATH, 'users', "#{name}.json")
