@@ -5,7 +5,11 @@
       "Sid": "Server stuff",
       "Effect": "Allow",
       "Resource": "*:*",
-      "Action": ["PutDistributeState","PutSrvKeepalive","GetDistribute"]
+      "Action": [
+        "PutDistributeState",
+        "PutSrvKeepalive",
+        "GetDistribute"
+      ]
     }
   ]
 }

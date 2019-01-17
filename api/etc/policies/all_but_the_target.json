@@ -1,12 +1,12 @@
 {
   "Version": "2018-12-18",
   "Statement": [
-  	{
-  	  "Sid":"Deny Target",
-  	  "Effect": "Deny",
-  	  "Resource": "demoapp:*",
-  	  "Action": "SetTarget"
-  	},
+    {
+      "Sid": "Deny Target",
+      "Effect": "Deny",
+      "Resource": "demoapp:*",
+      "Action": "SetTarget"
+    },
     {
       "Sid": "Allow the rest",
       "Effect": "Allow",

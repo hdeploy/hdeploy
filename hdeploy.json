@@ -1,7 +1,7 @@
 {
   "api": {
-    "http_user": "pviet",
-    "http_password": "derp",
+    "http_user": "jodom",
+    "http_password": "Justin",
     "endpoint" : "http://10.116.250.131:8080"
   },
   "cli": {
