@@ -8,22 +8,70 @@ require 'pry'
 module HDeploy
   CONFPATH = "/Users/pviet/repos/hdeploy/hdeploy/api/etc/"
 
-  class Policy
-    @@policies = {}
+  class Cache
+    @@cache = {}
 
+    def self.raw_get(k)
+      @@cache[k]
+    end
+
+    def self.get_or_block(id, file,ttl = 86400)
+      obj = nil
+
+      if @@cache.key? id
+        c = @@cache[id]
+        #obj, obj_file, obj_file_mtime,obj_expire = @@cache[id].values_at(:obj, :file, :file_mtime, :expire)
+        #if obj_file == file and obj_file_mtime == File.stat(obj_file).mtime and Time.new.to_i < obj_expire
+        if c[:expire] > Time.new.to_i and c[:file_mtime] == File.stat(file).mtime.to_i
+          puts "Loaded #{id} from cache"
+          return @@cache[id][:obj]
+        else
+          puts "Cache for #{id} expired"
+          puts "Reloading the actual object without replacing"
+          obj = @@cache[id][:obj]
+          obj.reload(file)
+        end
+      end
+
+      obj = yield if obj.nil?
+
+      @@cache[id] = {
+        obj: obj,
+        file: file,
+        file_mtime: File.stat(file).mtime.to_i,
+        expire: Time.new.to_i + ttl,
+      } unless obj.nil? # Special condition for nil object ; for users
+      obj
+    end
+
+    def self.delete(key)
+      @@cache.delete key
+    end
+
+    def self.delete_pattern(pattern)
+      @@cache.keys.select{|k| File.fnmatch(pattern,k)}.each do |k|
+        @@cache.delete k
+      end
+    end
+  end
+
+  class Policy
     def self.factory(policyname)
       # Rudimentary cache - must add TTL support
-      @@policies[policyname] ||= Policy.new(policyname)
+      HDeploy::Cache.get_or_block("policy:#{policyname}", File.join(CONFPATH, 'policies', "#{policyname}.json")) do
+        puts "Load policy #{policyname}"
+        Policy.new(policyname)
+      end
     end
 
     def initialize(policyname)
       @name = policyname
-      #FIXME: cache?
-      @file = File.join(CONFPATH, 'policies', "#{policyname}.json")
-      @raw = File.read(@file)
-      @policy = validatepolicy(@raw)
+      reload(File.join(CONFPATH, 'policies', "#{policyname}.json"))
+    end
 
-      @@policies[policyname] = self
+    def reload(file)
+      @raw = File.read(file)
+      @policy = validatepolicy(@raw)
     end
 
     def evaluate(action,resource)
@@ -63,7 +111,7 @@ module HDeploy
       policy.each_with_index do |statement,index|
 
         begin
-          # Convert Action and Resource to Array
+          # Convert action and Resource to Array
           %w[Action Resource].each do |k|
             statement[k] = [statement[k]] if statement[k].class == String
           end
@@ -87,7 +135,7 @@ module HDeploy
           raise "Sid must match /^[A-Za-z0-9\-\-_\s\:\*\?]+$/" unless statement['Sid'] =~ /^[A-Za-z0-9\-\-_\s\:\*\?]+$/
 
           statement['Action'].each do |a|
-            raise "Action #{a} does not match /^[A-Za-z0-9\*\?]+$/" unless a =~ /^[A-Za-z0-9\*\?]+$/
+            raise "action #{a} does not match /^[A-Za-z0-9\*\?]+$/" unless a =~ /^[A-Za-z0-9\*\?]+$/
           end
 
           statement['Resource'].each do |r|
@@ -100,70 +148,63 @@ module HDeploy
       end
       policy
     end
-
-
   end
 
   class User
-    @@cache = {}
-
-    def initialize(name, groups = [], own_policies = [])
+    def initialize(name:, bcrypt:, groups:, policies:)
       @name = name
-      @groups = groups.map(&:downcase)
-      @own_policies = own_policies.map(&:downcase)
-      @policies = []
-      load_policies()
-    end
-
-    def load_policies
-      if @own_policies
-        @own_policies.each do |policyname|
-          @policies << Policy.factory(policyname)
-        end
-      end
-
-      if @groups
-
-        # FIXME: don't load this each time
-        groupdefs = JSON.parse(File.read("#{CONFPATH}/groups.json"))
-
-        @groups.each do |group|
-          # Load group from file
-          raise "No such group #{group}" unless groupdefs.key? group
-          groupdefs[group].each do |policyname|
-            @policies << Policy.factory(policyname)
-          end
-        end
-      end
+      @bcrypt = bcrypt
+      @groups = groups.nil? ? [] : groups.map(&:downcase)
+      @own_policies = policies.nil? ? [] : policies.map(&:downcase)
+      groupdefs = Cache.raw_get('groupdefs') # This was set just before so I'm good
+      @policies = (@own_policies + @groups.map{|g| groupdefs[g] }.flatten).select{|g| not g.nil? }.uniq
     end
 
     def checkpw(pw)
       @bcrypt == pw
     end
 
-    def self.search_local(username, password)
+    def self.search_local(name, password)
       # Rudimentary cache
-      if @@cache.key? username
-        if @@cache[username].checkpw(password)
-          return @@cache[username]
+
+      group_file = "#{CONFPATH}/groups.json"
+      Cache.get_or_block('groupdefs', group_file) do
+        # If we reload this, we will invalidate ALL USERS cache
+        # It's kinda brutal but it's not gonna happen all the time either ...
+        puts "New group defs - cleanup all user cache"
+        Cache.delete_pattern('user:*')
+        JSON.parse(File.read(group_file))
+      end
+
+      file = File.join(CONFPATH, 'users', "#{name}.json")
+      user = HDeploy::Cache.get_or_block("user:#{name}", file) do
+        if File.exists?file
+          # FIXME: add syntax check
+          json = JSON.parse(File.read(file))
+          user = User.new(
+            name:     name,
+            bcrypt:   BCrypt::Password.new(json['bcrypt']),
+            groups:   json['groups'],
+            policies: json['policies'],
+          )
         else
-          raise "Wrong password"
+          puts "User #{username} doesn't exist in local JSON"
+          nil
         end
       end
 
-      file = File.join(CONFPATH, 'users', "#{username}.json")
-      if File.exists?file
-        json = JSON.parse(File.read(file))
-        @bcrypt = BCrypt::Password.new(json['password'])
-        raise "Wrong password" unless @bcrypt == password
-        return User.new(name,json['groups'] || [], json['policies'] || [])
+      if user and not user.checkpw(password)
+        raise "Wrong password"
       end
-      false
+
+      user
+
+      #FIXME: add ldap
     end
 
     def evaluate(action, resource)
-      @policies.each do |policy|
-        result = policy.evaluate(action,resource)
+      @policies.each do |policyname|
+        result = Policy.factory(policyname).evaluate(action,resource) # This calls the cache - lazy load
         if not result.nil?
           return result
         end

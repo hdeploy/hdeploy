@@ -2,5 +2,5 @@
   "groups": [
     "techops"
   ],
-  "password": "$2a$10$qQymWmIMgFjiaTKnygHmOO29KLdSlR61AKEL3omAAnCOynplhVLsG"
+  "bcrypt": "$2a$10$qQymWmIMgFjiaTKnygHmOO29KLdSlR61AKEL3omAAnCOynplhVLsG"
 }

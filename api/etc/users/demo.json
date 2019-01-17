@@ -1,5 +1,5 @@
 {
-  "password": "$2a$10$OhAm3WPdiQXvduvDj2/ECelCZ8tBhj29KC0LGupfMv11woadnGJFa",
+  "bcrypt": "$2a$10$OhAm3WPdiQXvduvDj2/ECelCZ8tBhj29KC0LGupfMv11woadnGJFa",
   "policies": [
     "servers"
   ]

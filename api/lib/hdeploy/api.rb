@@ -16,7 +16,7 @@ module HDeploy
       @conf = HDeploy::Conf.instance
 
       # Decorator load - this is a bit of a hack but it's really nice to have this syntax
-      # We just write @something before a method and the system will parse it
+      # We just write @something before a action and the system will parse it
 
 
     end
@@ -24,11 +24,11 @@ module HDeploy
     # -----------------------------------------------------------------------------
     # Some Auth stuff
     # This processes Authentication and authorization
-    def authorized?(method, app, env=nil)
+    def authorized?(action, app, env=nil)
       raise "app must match /^[A-Za-z0-9\\-\\_\\.]+$/" unless app =~ /^[A-Za-z0-9\-\_\.]+$/
       raise "env must match /^[A-Za-z0-9\\-\\_]+$/" unless env =~ /^[A-Za-z0-9\-\_]+$/ or env.nil?
 
-      puts "Process AAA #{method} app:#{app} env:#{env}"
+      puts "Process AAA #{action} app:#{app} env:#{env}"
 
       # We do first authentication and then once we know who we are, we do authorization
       auth = Rack::Auth::Basic::Request.new(request.env)
@@ -38,6 +38,7 @@ module HDeploy
         begin
           user = HDeploy::User.search_local(user,pass) # This will raise an exception if the user exists but it's a wrong pw
         rescue Exception => e
+          puts "#{e} - #{e.backtrace}"
           denyacl("Authentication failed 1")
         end
 
@@ -48,7 +49,7 @@ module HDeploy
         end
 
         # OK so in the variable user we have the current user with the loaded policies etc
-        if user.evaluate(method, "#{app}:#{env}")
+        if user.evaluate(action, "#{app}:#{env}")
           # User was authorized
         else
           denyacl("Authorization failed", 403)
