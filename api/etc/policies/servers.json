@@ -1,0 +1,11 @@
+{
+  "Version": "2018-12-18",
+  "Statement": [
+    {
+      "Sid": "Server stuff",
+      "Effect": "Allow",
+      "Resource": "*:*",
+      "Action": ["PutDistributeState","PutSrvKeepalive","GetDistribute"]
+    }
+  ]
+}

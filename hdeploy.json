@@ -2,7 +2,7 @@
   "api": {
     "http_user": "pviet",
     "http_password": "derp",
-    "endpoint" : "http://127.0.0.1:8080"
+    "endpoint" : "http://10.116.250.131:8080"
   },
   "cli": {
     "default_app": "demoapp",

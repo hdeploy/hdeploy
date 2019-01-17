@@ -25,11 +25,7 @@ module HDeploy
     # Some Auth stuff
     # This processes Authentication and authorization
     def authorized?(method, app, env=nil)
-      if method == 'PutDistributeState' # Special case
-        raise "srv must match /^[A-Za-z0-9\\-\\.]+$/" unless app =~ /^[A-Za-z0-9\-\.]+$/
-      else
-        raise "app must match /^[A-Za-z0-9\\-\\_]+$/" unless app =~ /^[A-Za-z0-9\-\_]+$/
-      end
+      raise "app must match /^[A-Za-z0-9\\-\\_\\.]+$/" unless app =~ /^[A-Za-z0-9\-\_\.]+$/
       raise "env must match /^[A-Za-z0-9\\-\\_]+$/" unless env =~ /^[A-Za-z0-9\-\_]+$/ or env.nil?
 
       puts "Process AAA #{method} app:#{app} env:#{env}"
@@ -42,33 +38,31 @@ module HDeploy
         begin
           user = HDeploy::User.search_local(user,pass) # This will raise an exception if the user exists but it's a wrong pw
         rescue Exception => e
-          headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
-          halt(401, "Not authorized 1 #{e}\n")
+          denyacl("Authentication failed 1")
         end
 
         # If not, search in LDAP
         # TODO
         if user.nil? or user == false
-          headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
-          halt(401, "Not authorized 2\n")
+          denyacl("No user")
         end
 
         # OK so in the variable user we have the current user with the loaded policies etc
         if user.evaluate(method, "#{app}:#{env}")
           # User was authorized
         else
-          halt(403, "Not authorized to do this action")
+          denyacl("Authorization failed", 403)
         end
 
       else
-        headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
-        halt(401, "Not authorized 3\n")
+        denyacl("No authentication provided")
       end
+    end
 
-      # So now we have a user and we have some groups, we need to look into policy config to know what is assigned to which user
-      # then later we actually run the policy against the user and their group
-
-
+    def denyacl(msg,code=401)
+      puts "Denied ACL: #{msg}"
+      headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
+      halt(code, "Not authorized #{msg}\n")
     end
 
     #def #protected!
@@ -113,7 +107,7 @@ module HDeploy
 
     put '/srv/keepalive/:hostname' do |hostname|
       #FIXME: these are SRV functions - not sure how to ACL them
-      #authorized?('PutSrvKeepalive', hostname)
+      authorized?('PutSrvKeepalive', hostname)
 
       ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
       ttl = request.body.read.force_encoding('US-ASCII') || '20'

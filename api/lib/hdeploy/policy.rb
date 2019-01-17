@@ -12,7 +12,7 @@ module HDeploy
     @@policies = {}
 
     def self.factory(policyname)
-      # Rudimentary cache
+      # Rudimentary cache - must add TTL support
       @@policies[policyname] ||= Policy.new(policyname)
     end
 
@@ -47,7 +47,7 @@ module HDeploy
         return final_result
       end
     end
- 
+
     def validatepolicy(policy)
       policy = JSON.parse(policy) if policy.is_a? String
       raise "Policy must contain Version and Statement" unless policy.keys.sort == %w[Version Statement].sort
@@ -147,7 +147,7 @@ module HDeploy
         if @@cache[username].checkpw(password)
           return @@cache[username]
         else
-          return false
+          raise "Wrong password"
         end
       end
 
