@@ -186,10 +186,8 @@ module HDeploy
       group_file = "#{CONFPATH}/groups.json"
       Cache.get_or_block('groupdefs', group_file) do
         # If we reload this, we will invalidate ALL USERS cache
-        # It's kinda brutal but it's not gonna happen all the time either ...
-        # So the use of this block is not to GET the group defs but rather force a rebuild on expire
+        # It's kinda brutal but it's not gonna happen all the time either ... - see reload() method
         puts "First time groupdefs load"
-        Cache.delete_pattern('user:*')
         Groupdefs.new(group_file)
       end
 
