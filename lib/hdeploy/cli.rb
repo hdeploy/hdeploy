@@ -35,7 +35,6 @@ module HDeploy
       @domain_name = @conf['cli']['domain_name']
       @app = @conf['cli']['default_app']
       @env = @conf['cli']['default_env']
-      @force = false
       @fakebuild = false
       @verbose = false
 
@@ -61,6 +60,13 @@ module HDeploy
           unless respond_to?(cmd[0])
             raise "no such command '#{cmd[0]}' in #{self.class} (#{__FILE__})"
           end
+
+          if @@cli_methods.key?(cmd[0].to_sym)
+            #puts "command #{cmd[0]}: loaded as cli method"
+          else
+            puts "command #{cmd[0]}: not loaded as cli method"
+          end
+
           cmds << cmd
         end
 
@@ -117,13 +123,58 @@ module HDeploy
     end
 
     # -------------------------------------------------------------------------
-    def app(newapp)
-      @app = newapp
-      puts "set app to #{newapp}"
+    @@cli_methods = {}
+
+    def self.cli_method(method_name, help = '', &block)
+      @@cli_methods[method_name] = help
+      define_method(method_name, &block)
     end
 
-    def list_servers(recipe = 'common')
-      return @client.get("/srv_by_recipe/#{recipe}")
+    cli_method(:help, 'Show the help') do
+
+      ret  = "=======================\n"
+      ret += " HDEPLOY CLI TOOL HELP\n"
+      ret += "=======================\n"
+      ret += "\n"
+      ret += "Some commands are modifiers for others, ie. app, env, verbose\n"
+      ret += "and should be set BEFORE the actual command, since they are processed in order\n"
+      ret += "\n"
+      ret += "Unless you are running a single app in your environment, in which case you could set it\n"
+      ret += "as default, you probably want to specify app:yourappname prior to nearly every command\n"
+      ret += "\n"
+      ret += "Commands list:\n"
+
+      text = {}
+      @@cli_methods.keys.sort.each do |cmd|
+        line = "  #{cmd}"
+        # param[1] is the name of the option
+        line += method(cmd).parameters.map{|param| param[0] == :req ? ":#{param[1]}" : "[:#{param[1]}]" }.join
+        text[cmd] = line
+      end
+
+      maxlength = text.values.map(&:length).max
+
+      text.each do |cmd,line|
+        ret += line + (' ' * (maxlength - line.length + 2)) + @@cli_methods[cmd] + "\n"
+      end
+
+      ret + "\n"
+    end
+        # -------------------------------------------------------------------------
+
+    cli_method(:verbose, "Modifier for other commands") do
+      @verbose = true
+    end
+
+    # -------------------------------------------------------------------------
+    #def verbose
+    #  @verbose = true
+    #end
+
+    #def app(newapp)
+    cli_method(:app, "Modifier for other commands - sets current app") do |appname|
+      @app = appname
+      puts "set app to #{appname}"
     end
 
     def prune_artifacts
@@ -176,7 +227,7 @@ module HDeploy
       end
     end
 
-    def prune(prune_env='nowhere')
+    cli_method(:prune, "Deletes oldest artifacts in specified environment - defaults to unused artifacts only") do |prune_env='nowhere'|
       _conf_fill_defaults
       c = @conf['build'][@app]
       prune_count = c['prune'].to_i #FIXME: integrity check.
@@ -238,7 +289,7 @@ module HDeploy
       prune_artifacts
     end
 
-    def state
+    cli_method(:state, "for current app - add verbose before to get a server list") do
       dist = JSON.parse(@client.get("/distribute/#{@app}"))
       dist_state = JSON.parse(@client.get("/distribute_state/#{@app}"))
       targets = JSON.parse(@client.get("/target/#{@app}"))
@@ -337,48 +388,24 @@ module HDeploy
       ret
     end
 
-    def verbose
-      @verbose = true
-    end
-
-    def force
-      @force=true
-    end
-
-    def env(newenv)
-      @env = newenv
+    cli_method(:env, 'Set environment for following command ie. dev stg prd etc') do |envname|
+      @env = envname
       puts "set env to #{@env}"
     end
 
-    def undistribute(build_tag)
-      @client.delete("/distribute/#{@app}/#{@env}/#{build_tag}")
+    cli_method(:undistribute, "Revokes distribution for an artifact (usually used for cleanup)") do |artifact_id|
+      @client.delete("/distribute/#{@app}/#{@env}/#{artifact_id}")
     end
 
-    def help
-      puts "Possible commands:"
-      puts "  build (or build:branch)"
-      puts "  distribute:nameofartifact"
-      puts "  undistribute:nameofartifact"
-      puts "  symlink:nameofartifact"
-      puts "  fulldeploy:nameofartifact (combines distribute and symlink)"
-      puts "  state"
-      puts
-      puts "option commands:"
-      puts "  env:someenv"
-      puts "  app:appname"
-      puts
-      puts "Example: hdeploy env:production build"
-    end
-
-    def fakebuild
+    cli_method(:fakebuild, "Modifier for development purposes") do
       @fakebuild = true
     end
 
-    def initrepo
+    cli_method(:init, "Alias for initrepo") do
       init()
     end
 
-    def init
+    cli_method(:initrepo, "Clones repository locally for build") do
       _conf_fill_defaults
       c = @conf['build'][@app]
       repo_dir = File.expand_path(c['repo_dir'])
@@ -434,7 +461,7 @@ module HDeploy
       end
     end
 
-    def build(branch = 'master')
+    cli_method(:build, "Runs a local build and registers given tarball - defaults to master") do |branch = 'master'|
       _conf_fill_defaults
       prune_build_env
 
@@ -550,12 +577,12 @@ module HDeploy
       }))
     end
 
-    def fulldeploy(build_tag)
-      distribute(build_tag)
-      symlink(build_tag)
+    cli_method(:fulldeploy, "Does distribute + symlink in a single command") do |artifact_id|
+      distribute(artifact_id)
+      symlink(artifact_id)
     end
 
-    def distribute(build_tag)
+    cli_method(:distribute, "Sets an artifact to be deployed (without actual activation)") do |build_tag|
       r = @client.put("/distribute/#{@app}/#{@env}",build_tag)
       if r =~ /^OK /
         h = JSON.parse(@client.get("/srv/by_app/#{@app}/#{@env}"))
@@ -574,25 +601,25 @@ module HDeploy
     end
 
     # Does this really have to exist? Or should I just put it in the symlink method?
-    def target(artid = 'someid')
+    cli_method(:target, "Sets a previously deployed artifact as target - you usually would prefer to run 'symlink' than this command") do |artifact_id|
 
       # We just check if the artifact is set to be distributed to the server
       # for the actual presence we will only check in the symlink part.
 
       todist = JSON.parse(@client.get("/distribute/#{@app}/#{@env}"))
-      raise "artifact #{artid} is not set to be distributed for #{@app}/#{@env} - please choose in this list: #{todist.keys}" unless todist.has_key? artid
-      return @client.put("/target/#{@app}/#{@env}", artid)
+      raise "artifact #{artifact_id} is not set to be distributed for #{@app}/#{@env} - please choose in this list: #{todist.keys}" unless todist.has_key? artifact_id
+      return @client.put("/target/#{@app}/#{@env}", artifact_id)
     end
 
-    def symlink(target)
-      target(target)
+    cli_method(:symlink, "Sets target artifact in a given app/env and then actually runs the symlink and post deploy scripts") do |artifact_id|
+      target(artifact_id)
 
       h = JSON.parse(@client.get("/srv/by_app/#{@app}/#{@env}"))
 
       raise "no server with #{@app}/#{@env}" unless h.keys.length > 0
       h.each do |host,conf|
-        if !(conf['artifacts'].include? target)
-          raise "artifact #{target} is not present on server #{host}. Please run hdeploy env:#{@env} distribute:#{target}"
+        if !(conf['artifacts'].include? artifact_id)
+          raise "artifact #{artifact_id} is not present on server #{host}. Please run hdeploy env:#{@env} distribute:#{artifact_id}"
         end
       end
 
@@ -600,7 +627,7 @@ module HDeploy
       system("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo hdeploy_node symlink'")
 
       # And on a single server, run the single hook.
-      hookparams = { app: @app, env: @env, artifact: target, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
+      hookparams = { app: @app, env: @env, artifact: artifact_id, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
       system("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo hdeploy_node post_symlink_run_once'")
     end
   end
