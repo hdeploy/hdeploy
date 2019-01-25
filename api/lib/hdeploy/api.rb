@@ -21,6 +21,36 @@ module HDeploy
 
     end
 
+    @@api_help = {}
+
+    def self.api_endpoint(method, uri, policy_action_name, description, &block)
+      # Magic: we are reading app/env from block args
+      # Why am I doing this here rather than inside a single send? Because that way
+      # it's evaluated only at startup, vs evaluated at each call
+      @@api_help["#{method.upcase} #{uri}"] = {
+        policy_action_name: policy_action_name,
+        description: description,
+      }
+
+      if policy_action_name.nil?
+        # This is a no authorization thing - just send as-is
+        send(method, uri, &block)
+      else
+        if block.parameters.map{|p| p.last}.include? :app
+          send(method, uri) do |*args|
+            authorized?(policy_action_name, params[:app], params[:env])
+            instance_exec(*args, &block)
+          end
+        else
+          send(method, uri) do |*args|
+            authorized?(policy_action_name, args.first, params[:env])
+            # The instance exec passes the env such as request params etc
+            instance_exec(*args, &block)
+          end
+        end
+      end
+    end
+
     # -----------------------------------------------------------------------------
     # Some Auth stuff
     # This processes Authentication and authorization
@@ -66,31 +96,25 @@ module HDeploy
       halt(code, "Not authorized #{msg}\n")
     end
 
-    #def #protected!
-    #  return if authorized?
-    #  headers['WWW-Authenticate'] = 'Basic realm="Restricted Area"'
-    #  halt 401, "Not authorized\n"
-    #end
-
-    #def authorized?
-    #  @auth ||=  Rack::Auth::Basic::Request.new(request.env)
-    #  @auth.provided? and @auth.basic? and @auth.credentials and @auth.credentials == @conf['api'].values_at('http_user','http_password')
-    #end
-
-    get '/health' do
+    api_endpoint(:get, '/health', nil, "Basic health check") do
       #FIXME: query db?
       "OK"
     end
 
-    get '/ping' do
+    api_endpoint(:get, '/ping', nil, "Basic ping (for load balancer)") do
       "OK"
     end
 
+    api_endpoint(:get, '/help', nil, "Help for the API") do
+      @@api_help.sort.map do |uri, data|
+        "#{uri} - #{data[:policy_action_name].nil? ? 'no perms/open' : 'requires: ' + data[:policy_action_name] } - #{data[:description]}\n"
+      end.join()
+    end
+
     # -----------------------------------------------------------------------------
-    put '/distribute_state/:hostname' do |hostname|
+    api_endpoint(:put, '/distribute_state/:hostname', 'PutDistributeState', "Server self reporting endpoint") do |hostname|
       #FIXME: these are SRV actions not user actions, not sure how to ACL them - might need a special treatment
       #FIXME: how can you only allow the servers to update their own IP or name or something??
-      authorized?('PutDistributeState', hostname)
 
       data = JSON.parse(request.body.read)
       #FIXME: very syntax of API call
@@ -106,10 +130,7 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
 
-    put '/srv/keepalive/:hostname' do |hostname|
-      #FIXME: these are SRV functions - not sure how to ACL them
-      authorized?('PutSrvKeepalive', hostname)
-
+    api_endpoint(:put, '/srv/keepalive/:hostname', 'PutSrvKeepalive', "Server self reporting endpoint") do |hostname|
       ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
       ttl = request.body.read.force_encoding('US-ASCII') || '20'
       @db.put_keepalive(hostname,ttl)
@@ -118,7 +139,7 @@ module HDeploy
 
 
     # -----------------------------------------------------------------------------
-    put '/artifact/:app/:artifact' do |app,artifact|
+    api_endpoint(:put, '/artifact/:app/:artifact', 'PutArtifact', "Registers artifact for given app") do |app,artifact|
       authorized?('PutArtifact', app)
       ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
 
@@ -130,9 +151,7 @@ module HDeploy
       "OK - registered artifact #{artifact} for app #{app}"
     end
 
-    delete '/artifact/:app/:artifact' do |app,artifact|
-      authorized?('DeleteArtifact', app)
-
+    api_endpoint(:delete, '/artifact/:app/:artifact', 'DeleteArtifact', "Delete an artifact (unregister)") do |app,artifact|
       # FIXME: don't allow to delete a target artifact.
       # FIXME: add a doesn't exist warning?
       @db.delete_artifact(app,artifact)
@@ -141,40 +160,34 @@ module HDeploy
 
 
     # -----------------------------------------------------------------------------
-    put '/target/:app/:myenv' do |app,myenv|
-      authorized?('PutTarget',app,myenv)
+    api_endpoint(:put, '/target/:app/:env', 'PutTarget', 'Sets current target artifact in a given app/environment') do |app,env|
 
       #FIXME check that the target exists
       artifact = request.body.read.force_encoding('US-ASCII')
-      @db.put_target(app,myenv,artifact)
-      "OK set target for app #{app} in environment #{myenv} to be #{artifact}"
+      @db.put_target(app,env,artifact)
+      "OK set target for app #{app} in environment #{env} to be #{artifact}"
     end
 
-    get '/target/:app/:myenv' do |app,myenv|
-      authorized?('GetTarget',app,myenv)
-
+    api_endpoint(:get, '/target/:app/:env','GetTarget', 'Current target artifact for this app/env') do |app,env|
       artifact = "unknown"
-      @db.get_target_env(app,myenv).each do |row|
+      @db.get_target_env(app,env).each do |row|
         artifact = row['artifact']
       end
 
       artifact
     end
 
-    get '/target/:app' do |app|
-      authorized?('GetTarget',app)
+    api_endpoint(:get, '/target/:app', 'GetTarget', 'Current target artifacts for this app') do |app|
       JSON.pretty_generate(@db.get_target(app).map(&:values).to_h)
     end
 
     # -----------------------------------------------------------------------------
-    get '/distribute/:app/:env' do |app,myenv|
-      authorized?('GetDistribute',app,myenv)
-
+    api_endpoint(:get, '/distribute/:app/:env', 'GetDistribute', 'Currently distributed artifacts for this app/env') do |app,env|
       # NOTE: cassandra implementation uses active_env since it doesn't know how to do joins
       r = {}
-      target = @db.get_target_env(app,myenv)
+      target = @db.get_target_env(app,env)
 
-      @db.get_distribute_env(app,myenv).each do |row|
+      @db.get_distribute_env(app,env).each do |row|
         artifact = row.delete 'artifact'
         row['target'] = (target.first.values.first == artifact)
         r[artifact] = row
@@ -185,9 +198,7 @@ module HDeploy
 
 
     # -----------------------------------------------------------------------------
-    get '/distribute/:app' do |app|
-      authorized?('GetDistribute',app)
-
+    api_endpoint(:get, '/distribute/:app', 'GetDistribute', 'All distributed artifacts for this app') do |app|
       r = {}
 
       @db.get_distribute(app).each do |row|
@@ -200,16 +211,13 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     # This call is just a big dump. The client can handle the sorting / formatting.
-    get '/target_state/:app/:env' do |app,env|
-      authorized?('GetTargetState',app,env)
-
-      r = []
+    api_endpoint(:get, '/target_state/:app/:env', 'GetTargetState', "Big dump of target state") do |app,env|
       JSON.pretty_generate(@db.get_target_state(app,env))
     end
 
     # -----------------------------------------------------------------------------
     # This call is just a big dump. The client can handle the sorting / formatting.
-    get '/distribute_state/:app' do |app|
+    api_endpoint(:get, '/distribute_state/:app','GetDistributeState', "Big dump of distribute state") do |app|
       authorized?('GetDistributeState',app)
 
       r = []
@@ -222,8 +230,7 @@ module HDeploy
     end
 
     # -----------------------------------------------------------------------------
-    get '/artifact/:app' do |app|
-      authorized?('GetArtifact', app)
+    api_endpoint(:get, '/artifact/:app', 'GetArtifact', 'List of artifacts') do |app|
       r = {}
       @db.get_artifact_list(app).each do |row| # The reason it's like that is that we can get
         artifact = row.delete 'artifact'
@@ -234,7 +241,7 @@ module HDeploy
     end
 
     # -----------------------------------------------------------------------------
-    put '/distribute/:app/:env' do |app,env|
+    api_endpoint(:put, '/distribute/:app/:env', 'PutDistribute', "Distribute an artifact (in body) to app/env") do |app,env|
       authorized?('PutDistribute',app,env)
 
       artifact = request.body.read.force_encoding('US-ASCII')
@@ -254,8 +261,7 @@ module HDeploy
     end
 
     # -----------------------------------------------------------------------------
-    get '/srv/by_app/:app/:env' do |app,env|
-      authorized?('GetSrvByApp',app,env)
+    api_endpoint(:get, '/srv/by_app/:app/:env', 'GetSrvByApp', "For fabric ssh") do |app,env|
       # this gets the list that SHOULD have things distributed to them...
       r = {}
       @db.get_srv_by_app_env(app,env).each do |row|
@@ -269,7 +275,7 @@ module HDeploy
     end
 
     # -----------------------------------------------------------------------------
-    get '/demo_only_repo/:app/:file' do |app,file|
+    api_endpoint(:get, '/demo_only_repo/:app/:file', nil, "Don't use this in production") do |app,file|
       # No auth here
       halt 500,"wrong file name" if file =~ /[^A-Za-z0-9\.\-\_]/ or file.length < 1
       fullfile = File.expand_path "~/hdeploy_build/artifacts/#{app}/#{file}"
