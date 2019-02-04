@@ -27,7 +27,8 @@ module HDeploy
         # We also want some initialization stuff
         @schemas.each do |table,sql|
           result = @db.execute("SELECT sql FROM sqlite_master WHERE name='#{table}'").to_a
-          sql = "CREATE TABLE #{table} (#{sql} on conflict replace)"
+          sql = "CREATE TABLE #{table} (#{sql} on conflict replace)" # This on conflict replace is the specific thing ...
+          # Could be better with an explicit replace to be honest... #FIXME USE REPLACE
           puts sql
           if result.count == 0
             @db.execute(sql)
