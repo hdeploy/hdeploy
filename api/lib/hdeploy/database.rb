@@ -1,11 +1,17 @@
 require 'hdeploy/database/sqlite'
+require 'hdeploy/database/mysql' #FIXME: drivers? Optional load?
+
+require 'pry'
 
 module HDeploy
   class Database
-    def self.factory(type = :sqlite)
-      case type
-      when :sqlite
+    def self.factory
+      conf =  HDeploy::Conf.instance
+      case conf['api']['database_engine'].downcase # not case sensitive because that's easier
+      when nil, 'sqlite'
         return HDeploy::Database::SQLite.new
+      when 'mysql'
+        return HDeploy::Database::MySQL.new
       else
         raise "no such type #{type} for database"
       end

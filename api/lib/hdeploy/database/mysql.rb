@@ -1,5 +1,6 @@
 require 'mysql2'
 require 'pry'
+require 'json'
 
 module HDeploy
   class Database
@@ -22,34 +23,33 @@ module HDeploy
 
         # FIXME: regular run of expire?
         # select * from distribute_state where expire <  UNIX_TIMESTAMP(NOW());
-
-        @db = MysqlWrapper.new('default', 'mysql.json') #FIXME: path
+        @db = MySQLWrapper.new('default', 'mysql.json') #FIXME: path
 
         # We also want some initialization stuff
-        @schemas.each do |table,sql|
-          result = @db.execute("SELECT sql FROM sqlite_master WHERE name='#{table}'").to_a
-          sql = "CREATE TABLE #{table} (#{sql} on conflict replace)"
-          puts sql
-          if result.count == 0
-            @db.execute(sql)
-          elsif result.count == 1
-            if result.first.values.first != sql
-              puts "Update table #{table}"
-              puts "old: #{result.first.first}"
-              puts "new: #{sql}"
-              @db.execute("DROP table #{table}")
-              @db.execute(sql)
-            else
-              puts "Table #{table} structure OK"
-            end
-          end
-        end
+#        @schemas.each do |table,sql|
+#          result = @db.execute("SELECT sql FROM sqlite_master WHERE name='#{table}'").to_a
+#          sql = "CREATE TABLE #{table} (#{sql} on conflict replace)"
+#          puts sql
+#          if result.count == 0
+#            @db.execute(sql)
+#          elsif result.count == 1
+#            if result.first.values.first != sql
+#              puts "Update table #{table}"
+#              puts "old: #{result.first.first}"
+#              puts "new: #{sql}"
+#              @db.execute("DROP table #{table}")
+#              @db.execute(sql)
+#            else
+#              puts "Table #{table} structure OK"
+#            end
+#          end
+#        end#
 
-        @cleanup_due = 0
+#        @cleanup_due = 0
       end
 
       def raw_query(sql)
-        @db.execute(sql)
+        @db.query(sql)
       end
 
       def method_missing(m, *args, &block)
@@ -97,29 +97,32 @@ module HDeploy
         die "no such section #{@name} in file #{@jsonfile}" unless @conf.has_key? @name
         c = @conf[@name]
 
-        %w[user pass host base port].each do |param|
-          die "param missing #{param} in section #{name} of file #{file}" unless c.has_key? param
+        %w[pass host].each do |param|
+          die "param missing #{param} in section #{@name} of file #{@jsonfile}" unless c.has_key? param
+        end
+
+        c.keys.each do |param|
+          raise "invalid param #{param} in section #{@name} of file #{@jsonfile}" unless %w[user pass host base port].include? param
         end
 
         @subject = Mysql2::Client.new(
           host:     c['host'],
-          username: c['user'],
+          username: c['user'] || 'hdeploy',
           password: c['pass'],
-          database: c['base'],
-          port:     c['port'],
+          database: c['base'] || 'hdeploy',
+          port:     c['port'] || 3306,
           reconnect: true,
         )
       end
 
       def method_missing(method, *args, &block)
-
         # if the object was destroyed, we can re-create it automagically...!! :)
         _mysql_connect() if @subject.nil?
 
         if ['query', 'execute', 'prepare'].include? method.to_s
           begin
             @subject.send(method, *args, &block)
-          rescue Mysql::Error => e
+          rescue Mysql2::Error => e
             if e.to_s =~ /MySQL server has gone away/
               _mysql_connect()
               @subject.send(method, *args, &block)

@@ -1,6 +1,7 @@
 {
   "api": {
     "http_user": "demo",
-    "http_password": "demo"
+    "http_password": "demo",
+    "database_engine": "mysql"
   }
 }

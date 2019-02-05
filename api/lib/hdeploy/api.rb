@@ -12,8 +12,8 @@ module HDeploy
     def initialize
       super
 
-      @db = HDeploy::Database.factory()
       @conf = HDeploy::Conf.instance
+      @db = HDeploy::Database.factory
 
       # Decorator load - this is a bit of a hack but it's really nice to have this syntax
       # We just write @something before a action and the system will parse it
