@@ -11,8 +11,8 @@ module HDeploy
 
         @queries.merge!({
           # These are special just because they expire
-          put_keepalive: "INSERT INTO srv_keepalive (hostname,expire) VALUES(?,UNIX_TIMESTAMP(NOW()) + ?)",
-          put_distribute_state: "INSERT INTO distribute_state (app,env,hostname,current,artifacts,expire) VALUES(?,?,?,?,?,UNIX_TIMESTAMP(NOW()) + 1800)",
+          put_keepalive: "REPLACE INTO srv_keepalive (hostname,expire) VALUES(?,UNIX_TIMESTAMP(NOW()) + ?)",
+          put_distribute_state: "REPLACE INTO distribute_state (app,env,hostname,current,artifacts,expire) VALUES(?,?,?,?,?,UNIX_TIMESTAMP(NOW()) + 1800)",
 
           # FIXME ADD some ? and on duplicate key update
 
@@ -21,31 +21,33 @@ module HDeploy
           expire_keepalive: "DELETE FROM srv_keepalive WHERE expire < UNIX_TIMESTAMP(NOW())",
         })
 
+        @schemas = {
+          srv_keepalive:    'hostname varchar(255), expire bigint, primary key (hostname), index (expire)',
+          distribute_state: 'app varchar(255), env varchar(63), hostname varchar(255), current varchar(255), artifacts longtext, expire bigint, primary key (app,env,hostname), index (expire)',
+          distribute:       'artifact varchar(255), app varchar(255), env varchar(63), primary key(artifact,app,env)',
+          artifacts:        'artifact varchar(255), app varchar(255), source longtext, altsource longtext, checksum varchar(60), primary key (artifact,app)',
+          target:           'app varchar(255), env varchar(63), artifact varchar(255), primary key (app,env)',
+        }
+
         # FIXME: regular run of expire?
         # select * from distribute_state where expire <  UNIX_TIMESTAMP(NOW());
         @db = MySQLWrapper.new('default', 'mysql.json') #FIXME: path
 
         # We also want some initialization stuff
-#        @schemas.each do |table,sql|
-#          result = @db.execute("SELECT sql FROM sqlite_master WHERE name='#{table}'").to_a
-#          sql = "CREATE TABLE #{table} (#{sql} on conflict replace)"
-#          puts sql
-#          if result.count == 0
-#            @db.execute(sql)
-#          elsif result.count == 1
-#            if result.first.values.first != sql
-#              puts "Update table #{table}"
-#              puts "old: #{result.first.first}"
-#              puts "new: #{sql}"
-#              @db.execute("DROP table #{table}")
-#              @db.execute(sql)
-#            else
-#              puts "Table #{table} structure OK"
-#            end
-#          end
-#        end#
+        @schemas.each do |table,sql|
+          begin
+            result = @db.query("DESC `#{table}`")
+          rescue Mysql2::Error => e
+            if e.to_s =~ /Table.*#{table}.*doesn't exist/
+              @db.query("CREATE TABLE #{table} (#{sql})")
+            else
+              puts "Got MySQL error - raising it"
+              raise e
+            end
+          end
+        end
 
-#        @cleanup_due = 0
+        @cleanup_due = 0
       end
 
       def raw_query(sql)
@@ -62,9 +64,9 @@ module HDeploy
             @cleanup_due = Time.new.to_i + 5 # Do it again in a minute
             puts "DB Expire cleanup"
             expire_distribute_state
-            puts "Distribute state: #{@db.changes} changes"
+            puts "Distribute state: #{@db.affected_rows} changes"
             expire_keepalive
-            puts "Keepalive: #{@db.changes} changes"
+            puts "Keepalive: #{@db.affected_rows} changes"
           end
         else
           raise "No such query/method #{m} in class HDeploy::Database::SQLite"

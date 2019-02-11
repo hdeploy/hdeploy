@@ -122,6 +122,7 @@ module HDeploy
       # each line contains an artifact or a target.
       # I expect a hash containing app, which in turn contain envs, contains current and a list of artifacts
       data.each do |row|
+        puts "Current for #{hostname}: #{row['current']}"
         @db.put_distribute_state(row['app'], row['env'], hostname, row['current'], row['artifacts'].sort.join(','))
       end
       #FIxmE: add check if ok
@@ -189,7 +190,7 @@ module HDeploy
 
       @db.get_distribute_env(app,env).each do |row|
         artifact = row.delete 'artifact'
-        row['target'] = (target.first.values.first == artifact)
+        row['target'] = target.first ? (target.first.values.first == artifact) : false
         r[artifact] = row
       end
 
@@ -211,7 +212,7 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     # This call is just a big dump. The client can handle the sorting / formatting.
-    api_endpoint(:get, '/target_state/:app/:env', 'GetTargetState', "Big dump of target state") do |app,env|
+    api_endpoint(:get, '/target_state/:app/:env', 'GetTargetState', "Target state for app/env") do |app,env|
       JSON.pretty_generate(@db.get_target_state(app,env))
     end
 

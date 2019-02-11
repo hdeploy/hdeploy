@@ -20,18 +20,18 @@ module HDeploy
     def initialize
       puts 'DB Init'
       @queries = {
-        put_distribute_state: 'INSERT INTO distribute_state (app,env,hostname,current,artifacts) VALUES(?,?,?,?,?)', # NEEDS TTL
-        put_keepalive:        'INSERT INTO srv_keepalive (hostname) VALUES(?)', # NEEDS TTL
+        put_distribute_state: 'REPLACE INTO distribute_state (app,env,hostname,current,artifacts) VALUES(?,?,?,?,?)', # NEEDS TTL
+        put_keepalive:        'REPLACE INTO srv_keepalive (hostname) VALUES(?)', # NEEDS TTL
         get_keepalive:        'SELECT * FROM srv_keepalive WHERE hostname = ?',
 
-        put_artifact:    'INSERT INTO artifacts (artifact,app,source,altsource,checksum) VALUES(?,?,?,?,?)',
+        put_artifact:    'REPLACE INTO artifacts (artifact,app,source,altsource,checksum) VALUES(?,?,?,?,?)',
         delete_artifact: 'DELETE FROM artifacts WHERE app = ? AND artifact = ?',
 
-        put_target:     'INSERT INTO target (app,env,artifact) VALUES(?,?,?)',
+        put_target:     'REPLACE INTO target (app,env,artifact) VALUES(?,?,?)',
         get_target_env: 'SELECT artifact FROM target WHERE app = ? AND env = ?',
         get_target:     'SELECT env,artifact FROM target WHERE app = ?',
 
-        put_distribute:     'INSERT INTO distribute (artifact,app,env) VALUES(?,?,?)',
+        put_distribute:     'REPLACE INTO distribute (artifact,app,env) VALUES(?,?,?)',
         delete_distribute:  'DELETE FROM distribute WHERE app = ? AND env = ? AND artifact = ?',
 
         # The SQL word 'USING' for joins is not in SQLite so using this syntax so it's compatible with both SQLite and MySQL
