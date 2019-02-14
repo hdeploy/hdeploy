@@ -24,3 +24,42 @@ And add SQLite support
 (later on, MySQL too)
 They should both return some data structures that are identical
 Have all the same basic queries
+
+
+# Configuration
+
+Note: in directories, the %s is replaced by the app name
+
+```json
+{
+  "build": {
+    "_default": {
+      "upload_locations": [
+        {
+          "type":"directory",
+          "directory":"~/hdeploy_build/artifacts/%s"
+        },
+        {
+          "type":"s3",
+          "bucket":"somebucket",
+          ""
+        },
+        {
+          "type":"scp",
+          "user":"someuser",
+          "ssh_key":"path_to_somekey",
+          "hostname":"somehost.net",
+          "directory":"/path/to/directory"
+        },
+        {
+          "type":"http",
+          "method":"PUT",
+          "username":"someuser",
+          "password":"somepass",
+          "url":"http://artifactory.derp.com/path/to/repo"
+        }
+      ]
+    }
+  }
+}
+```
