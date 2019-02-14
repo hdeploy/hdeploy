@@ -35,7 +35,6 @@ module HDeploy
       @domain_name = @conf['cli']['domain_name']
       @app = @conf['cli']['default_app']
       @env = @conf['cli']['default_env']
-      @fakebuild = false
       @verbose = false
 
 
@@ -397,10 +396,6 @@ module HDeploy
       @client.delete("/distribute/#{@app}/#{@env}/#{artifact_id}")
     end
 
-    cli_method(:fakebuild, "Modifier for development purposes") do
-      @fakebuild = true
-    end
-
     cli_method(:init, "Alias for initrepo") do
       init()
     end
@@ -474,7 +469,7 @@ module HDeploy
       repo_dir = File.expand_path(c['repo_dir'])
 
       raise "Error in source dir #{repo_dir}. Please run hdeploy initrepo" unless Dir.exists? (File.join(repo_dir, '.git'))
-      directory = File.expand_path(File.join(c['build_dir'], (@app + start_time.strftime('.%Y%m%d_%H_%M_%S.'))) + ENV['USER'] + (@fakebuild? '.fakebuild' : ''))
+      directory = File.expand_path(File.join(c['build_dir'], (@app + start_time.strftime('.%Y%m%d_%H_%M_%S.'))) + ENV['USER'])
       FileUtils.mkdir_p directory
 
       # Update GIT directory
@@ -524,7 +519,7 @@ module HDeploy
 
       # Get a tag
       gitrev = (`git log -1 --pretty=oneline`)[0..11] # not 39.
-      build_tag = @app + start_time.strftime('.%Y%m%d_%H_%M_%S.') + branch + '.' + gitrev + '.' + ENV['USER'] + (@fakebuild? '.fakebuild' : '')
+      build_tag = @app + start_time.strftime('.%Y%m%d_%H_%M_%S.') + branch + '.' + gitrev + '.' + ENV['USER']
 
       notify "build start - #{ENV['USER']} - #{build_tag}"
 
@@ -540,18 +535,16 @@ module HDeploy
         try_files.unshift(repoconf['build_script']) if repoconf['build_script']
       end
 
-      unless @fakebuild
-        build_script = false
-        try_files.each do |f|
-          if File.exists?(f) and File.executable?(f)
-            build_script = f
-            break
-          end
+      build_script = false
+      try_files.each do |f|
+        if File.exists?(f) and File.executable?(f)
+          build_script = f
+          break
         end
-
-        raise "no executable build script file. Tried files: #{try_files.join(' ')}" unless build_script
-        mysystem(build_script)
       end
+
+      raise "no executable build script file. Tried files: #{try_files.join(' ')}" unless build_script
+      mysystem(build_script)
 
       # Make tarball
       FileUtils.mkdir_p c['artifact_dir'] #FIXME: check for existence of artifacts
