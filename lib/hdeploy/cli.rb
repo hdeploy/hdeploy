@@ -129,6 +129,7 @@ module HDeploy
       define_method(method_name, &block)
     end
 
+    # -------------------------------------------------------------------------
     cli_method(:help, 'Show the help') do
 
       ret  = "=======================\n"
@@ -159,21 +160,45 @@ module HDeploy
 
       ret + "\n"
     end
-        # -------------------------------------------------------------------------
 
+    # -------------------------------------------------------------------------
     cli_method(:verbose, "Modifier for other commands") do
       @verbose = true
     end
 
-    # -------------------------------------------------------------------------
-    #def verbose
-    #  @verbose = true
-    #end
 
-    #def app(newapp)
     cli_method(:app, "Modifier for other commands - sets current app") do |appname|
       @app = appname
       puts "set app to #{appname}"
+    end
+
+    # -------------------------------------------------------------------------
+    cli_method(:upload_artifact, "Upload a file to configured location(s)") do |file|
+
+      _conf_fill_defaults # unless already filled?
+      build_tag = File.basename(file,'.tar.gz') #FIXME: only supports .tar.gz at this point...
+
+      # Currently, artifacts can be uploaded to four different places: local directory, S3, scp location, artifactory, and a local directory
+      # The configuration directives are such: { "build": { "nameofapp": { "upload_locations": [ { ... upload destination data here ... } ] } }
+      # Format of the upload destination data in README.md
+
+      @conf['build'][@app]['upload_locations'].each do |upload_location|
+        case upload_location['type']
+        when 'directory'
+          destdir = File.expand_path(sprintf(upload_location['directory'], @app))
+          puts destdir
+        when 's3'
+
+        when 'scp'
+
+        when 'http'
+
+        else
+          raise "Supported upload types directory/sc3/scp/http (got: #{upload_location['type']})"
+        end
+
+      end
+
     end
 
     def prune_artifacts
@@ -226,6 +251,7 @@ module HDeploy
       end
     end
 
+    # -------------------------------------------------------------------------
     cli_method(:prune, "Deletes oldest artifacts in specified environment - defaults to unused artifacts only") do |prune_env='nowhere'|
       _conf_fill_defaults
       c = @conf['build'][@app]
@@ -451,7 +477,11 @@ module HDeploy
       c.each do |app,aconf|
         next if app == '_default'
         c['_default'].each do |k,v|
-          aconf[k] ||= sprintf(v.to_s,app)
+          if v.is_a? String
+            aconf[k] ||= sprintf(v.to_s,app)
+          else
+            aconf[k] ||= v
+          end
         end
       end
     end

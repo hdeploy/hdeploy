@@ -2,30 +2,31 @@
   "api": {
     "http_user": "pviet",
     "http_password": "derp",
-    "endpoint" : "http://10.116.250.155:8080"
+    "endpoint": "http://10.116.250.155:8080"
   },
   "cli": {
     "default_app": "demoapp",
     "default_env": "dev"
   },
-
   "build": {
-
     "_default": {
       "build_dir": "~/hdeploy_build/build/%s",
       "repo_dir": "~/hdeploy_build/repos/%s",
-      "artifacts": "~/hdeploy_build/artifacts/%s"
+      "artifacts": "~/hdeploy_build/artifacts/%s",
+      "upload_locations": [
+        {
+          "type": "directory",
+          "directory": "~/hdeploy_build/artifacts/%s"
+        }
+      ]
     },
-
     "demoapp": {
       "git": "git@github.com:hdeploy/demoapp"
     }
   },
-
   "deploy": {
     "demoapp:dev": {
       "symlink": "~/hdeploy_demoapp/current"
     }
   }
 }
-
