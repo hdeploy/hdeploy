@@ -183,22 +183,89 @@ module HDeploy
       # Format of the upload destination data in README.md
 
       @conf['build'][@app]['upload_locations'].each do |upload_location|
+        next if upload_location.key? 'active' and not upload_location['active']
+
         case upload_location['type']
+
+        # -------------------------------------------------------------------------
         when 'directory'
+        # -------------------------------------------------------------------------
           destdir = File.expand_path(sprintf(upload_location['directory'], @app))
-          puts destdir
+
+          FileUtils.mkdir_p destdir unless File.directory? destdir
+
+          if File.stat(file).dev == File.stat(destdir).dev
+            # Same dev: hard link
+            puts "Hardlink #{file} to #{destdir}"
+            File.link(file, File.join(destdir,File.basename(file)))
+          else
+            # Different dev: copy
+            puts "Copy #{file} to #{destdir}"
+            FileUtils.cp(file, destdir)
+          end
+
+
+        # -------------------------------------------------------------------------
         when 's3'
+        # -------------------------------------------------------------------------
+          puts "s3: work in progress"
+          require 'aws-sdk-s3'
+          s3 = Aws::S3::Client.new(access_key_id: upload_location['access_key'], secret_access_key: upload_location['secret_key'])
+          bucket, prefix = upload_location.values_at('bucket', 'prefix')
+          prefix += '/' unless prefix.end_with? '/'
+          objkey = prefix + File.basename(file)
 
+          unless upload_location['overwrite'] == true
+            puts "Check for prior existence of object"
+            begin
+              s3.get_object_acl(bucket: bucket, key: objkey)
+              raise "Object #{bucket} / #{objkey} already exists"
+            rescue Aws::S3::Errors::NoSuchKey
+              # This is actually good
+              puts "Doesn't exist"
+            end
+          end
+
+          puts "Upload #{file} to s3://#{upload_location['bucket']}/#{prefix}#{File.basename(file)} ..."
+
+          File.open(file, 'rb') do |io|
+            s3.put_object(bucket: bucket, key: objkey, body: io)
+          end
+
+        # -------------------------------------------------------------------------
         when 'scp'
+        # -------------------------------------------------------------------------
+          puts "scp: work in progress"
 
+        # -------------------------------------------------------------------------
         when 'http'
+        # -------------------------------------------------------------------------
+          require 'curb'
+          c = Curl::Easy.new()
+          c.http_auth_types = :basic
+          c.username = upload_location['user']
+          c.password = upload_location['password']
 
+          dest_url = sprintf(upload_location['url'], @app)
+          dest_url += '/' unless dest_url.end_with? '/'
+          c.url = dest_url + File.basename(file)
+
+          case upload_location['method'].upcase
+          when 'PUT'
+            c.http_put(File.read(file))
+          when 'POST'
+            c.http_post(File.read(file))
+          else
+            raise "Supported methods PUT POST"
+          end
+
+          raise "response code was #{c.response_code}" unless c.response_code == 200
         else
           raise "Supported upload types directory/sc3/scp/http (got: #{upload_location['type']})"
         end
 
       end
-
+      ''
     end
 
     def prune_artifacts
