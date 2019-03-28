@@ -12,18 +12,25 @@ module HDeploy
 
     def initialize(file)
 
-      # this is for omnibus and such
-      # not very elegant but it works...
-      # FIXME: add some other seach paths.
+      # Added omnibus paths. Not very elegant but works
       if file.nil?
-        f = __FILE__
-        if f.start_with? '/opt/hdeploy/'
-          file = '/opt/hdeploy/hdeploy.json'
-        elsif f.start_with? '/opt/hdeploy-server/'
-          file = '/opt/hdeploy-server/hdeploy-server.json'
-        else
-          file = './hdeploy.json'
+        search_path = %w[
+          hdeploy.json
+          etc/hdeploy.json
+          /opt/hdeploy/hdeploy.json
+          /opt/hdeploy-api/hdeploy.json
+          /home/app/hdeploy/api/hdeploy.json
+          /home/app/hdeploy/api/etc/hdeploy.json
+        ]
+
+        search_path.each do |f|
+          if File.exists? f
+            file = f
+            break
+          end
         end
+
+        raise "unable to find conf file in search path #{search_path}" if file.nil?
       end
 
       @file = file
