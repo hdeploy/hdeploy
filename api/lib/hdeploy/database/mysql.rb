@@ -31,7 +31,7 @@ module HDeploy
 
         # FIXME: regular run of expire?
         # select * from distribute_state where expire <  UNIX_TIMESTAMP(NOW());
-        @db = MySQLWrapper.new('default', 'mysql.json') #FIXME: path
+        @db = MySQLWrapper.new('default', File.join(HDeploy::Conf.conf_path, 'mysql.json'))
 
         # We also want some initialization stuff
         @schemas.each do |table,sql|
