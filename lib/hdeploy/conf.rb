@@ -7,33 +7,33 @@ module HDeploy
 
     @@instance = nil
     @@default_values = []
+    @@conf_path = nil
 
-    attr_reader :file
-
-    def initialize(file)
+    def initialize(conf_path)
 
       # Added omnibus paths. Not very elegant but works
-      if file.nil?
-        search_path = %w[
-          hdeploy.json
-          etc/hdeploy.json
-          /opt/hdeploy/hdeploy.json
-          /opt/hdeploy-api/hdeploy.json
-          /home/app/hdeploy/api/hdeploy.json
-          /home/app/hdeploy/api/etc/hdeploy.json
+      if conf_path.nil?
+        try_path = %w[
+          .
+          etc
+          /etc/hdeploy
+          /opt/hdeploy/etc
+          /opt/hdeploy-api
+          /home/app/hdeploy/api
+          /home/app/hdeploy/api/etc
         ]
 
-        search_path.each do |f|
-          if File.exists? f
-            file = f
+        try_path.each do |p|
+          if File.exists?(File.join(p, 'hdeploy.json'))
+            conf_path = File.expand_path(p)
             break
           end
         end
 
-        raise "unable to find conf file in search path #{search_path}" if file.nil?
+        raise "unable to find conf file hdeploy.json in search path #{try_path}" if conf_path.nil?
       end
 
-      @file = file
+      @@conf_path = conf_path
       reload
     end
 
@@ -44,16 +44,25 @@ module HDeploy
 
     # -------------------------------------------------------------------------
     def reload
-      raise "unable to find conf file #{@file}" unless File.exists? @file
+      @conf = get_json_file(File.join(@@conf_path, 'hdeploy.json'))
+    end
 
-      st = File.stat(@file)
-      raise "config file #{@file} must not be a symlink" if File.symlink?(@file)
-      raise "config file #{@file} must be a regular file" unless st.file?
-      raise "config file #{@file} must have uid 0" unless st.uid == 0 or Process.uid != 0
-      raise "config file #{@file} must not allow group/others to write" unless sprintf("%o", st.mode) =~ /^100[46][04][04]/
+    def get_json_file(file)
+      raise "unable to find file #{file}" unless File.file? file
 
-      # Seems we have checked everything. Woohoo!
-      @conf = JSON.parse(File.read(@file))
+      st = File.stat(file)
+      raise "config file #{file} must have uid 0" unless st.uid == 0 or Process.uid != 0
+      raise "config file #{file} must not allow group/others to write" unless sprintf("%o", st.mode) =~ /^100[46][04][04]/
+
+      JSON.parse(File.read(file))
+    end
+
+    def file
+      File.join(@@conf_path, 'hdeploy.json')
+    end
+
+    def self.conf_path
+      @@conf_path
     end
 
     # -------------------------------------------------------------------------

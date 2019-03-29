@@ -6,7 +6,6 @@ require 'pry'
 # Because it's know and relatively simple and works
 
 module HDeploy
-  CONFPATH = "/Users/pviet/repos/hdeploy/hdeploy/api/etc/"
 
   class Cache
     @@cache = {}
@@ -15,7 +14,7 @@ module HDeploy
       @@cache[k][:obj]
     end
 
-    def self.get_or_block(id, file,ttl = 86400)
+    def self.get_or_execute_block(id, file,ttl = 86400)
       obj = nil
 
       if @@cache.key? id
@@ -74,7 +73,7 @@ module HDeploy
   class Policy
     def self.factory(policyname)
       # Rudimentary cache - must add TTL support
-      HDeploy::Cache.get_or_block("policy:#{policyname}", File.join(CONFPATH, 'policies', "#{policyname}.json")) do
+      HDeploy::Cache.get_or_execute_block("policy:#{policyname}", File.join(HDeploy::Conf.conf_path, 'policies', "#{policyname}.json")) do
         puts "Load policy #{policyname}"
         Policy.new(policyname)
       end
@@ -82,7 +81,7 @@ module HDeploy
 
     def initialize(policyname)
       @name = policyname
-      reload(File.join(CONFPATH, 'policies', "#{policyname}.json"))
+      reload(File.join(HDeploy::Conf.conf_path, 'policies', "#{policyname}.json"))
     end
 
     def reload(file)
@@ -183,16 +182,16 @@ module HDeploy
     def self.search_local(name, password)
       # Rudimentary cache
 
-      group_file = "#{CONFPATH}/groups.json"
-      Cache.get_or_block('groupdefs', group_file) do
+      group_file = "#{HDeploy::Conf.conf_path}/groups.json"
+      Cache.get_or_execute_block('groupdefs', group_file) do
         # If we reload this, we will invalidate ALL USERS cache
         # It's kinda brutal but it's not gonna happen all the time either ... - see reload() method
         puts "First time groupdefs load"
         Groupdefs.new(group_file)
       end
 
-      file = File.join(CONFPATH, 'users', "#{name}.json")
-      user = HDeploy::Cache.get_or_block("user:#{name}", file) do
+      file = File.join(HDeploy::Conf.conf_path, 'users', "#{name}.json")
+      user = HDeploy::Cache.get_or_execute_block("user:#{name}", file) do
         if File.exists?file
           # FIXME: add syntax check
           json = JSON.parse(File.read(file))
