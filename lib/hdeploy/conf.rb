@@ -74,6 +74,10 @@ module HDeploy
       @conf.each(&block)
     end
 
+    def key?(k)
+      @conf.key?k
+    end
+
     def keys
       @conf.keys
     end

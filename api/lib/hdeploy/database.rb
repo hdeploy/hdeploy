@@ -7,7 +7,10 @@ module HDeploy
   class Database
     def self.factory
       conf =  HDeploy::Conf.instance
-      case conf['api']['database_engine'].downcase # not case sensitive because that's easier
+      raise "no api section in config" unless conf.key? 'api'
+      engine = nil
+      engine = conf['api']['database_engine'].downcase if conf['api'].key? 'database_engine'
+      case engine
       when nil, 'sqlite'
         return HDeploy::Database::SQLite.new
       when 'mysql'
