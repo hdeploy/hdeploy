@@ -147,8 +147,9 @@ module HDeploy
       data = request.body.read
       data = JSON.parse(data)
       data['altsource'] ||= ''
+      data['multifile'] ||= 0
 
-      @db.put_artifact(artifact, app, data['source'], data['altsource'], data['checksum'])
+      @db.put_artifact(artifact, app, data['source'], data['altsource'], data['checksum'], data['multifile'])
       "OK - registered artifact #{artifact} for app #{app}"
     end
 
