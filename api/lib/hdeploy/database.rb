@@ -27,7 +27,7 @@ module HDeploy
         put_keepalive:        'REPLACE INTO srv_keepalive (hostname) VALUES(?)', # NEEDS TTL
         get_keepalive:        'SELECT * FROM srv_keepalive WHERE hostname = ?',
 
-        put_artifact:    'REPLACE INTO artifacts (artifact,app,source,altsource,checksum) VALUES(?,?,?,?,?)',
+        put_artifact:    'REPLACE INTO artifacts (artifact,app,source,altsource,checksum,multifile) VALUES(?,?,?,?,?,?)',
         delete_artifact: 'DELETE FROM artifacts WHERE app = ? AND artifact = ?',
 
         put_target:     'REPLACE INTO target (app,env,artifact) VALUES(?,?,?)',
@@ -42,13 +42,15 @@ module HDeploy
         # Integrity check: are there non-existent distribute artifacts????
         # For Cassandra we use this intermediate table active_env but this is the raw SQL.
 
-        get_distribute_env: 'SELECT distribute.artifact,source,altsource,checksum FROM artifacts INNER JOIN distribute ON distribute.artifact = artifacts.artifact WHERE artifacts.app = ? AND env = ?',
+        # Multifile is a true/false
+
+        get_distribute_env: 'SELECT distribute.artifact,source,altsource,checksum,multifile FROM artifacts INNER JOIN distribute ON distribute.artifact = artifacts.artifact WHERE artifacts.app = ? AND env = ?',
         get_distribute:     'SELECT env,artifacts.artifact FROM artifacts LEFT JOIN distribute ON distribute.artifact = artifacts.artifact WHERE artifacts.app = ?',
 
         get_distribute_state: 'SELECT env,hostname,artifacts,current FROM distribute_state WHERE app = ?',
         get_target_state:     'SELECT hostname,current FROM distribute_state WHERE app = ? AND env = ?',
-        get_artifact_list:    'SELECT artifact,source,altsource,checksum FROM artifacts WHERE app = ?',
-        get_artifact:         'SELECT artifact,source,altsource,checksum FROM artifacts WHERE app = ? AND artifact = ?',
+        get_artifact_list:    'SELECT artifact,source,altsource,checksum,multifile FROM artifacts WHERE app = ?',
+        get_artifact:         'SELECT artifact,source,altsource,checksum,multifile FROM artifacts WHERE app = ? AND artifact = ?',
 
         get_srv_by_app_env: 'SELECT hostname,current,artifacts FROM distribute_state WHERE app = ? AND env = ?',
         get_srv_by_app:     'SELECT hostname,current,artifacts FROM distribute_state WHERE app = ?',
@@ -58,7 +60,7 @@ module HDeploy
         srv_keepalive:    'hostname text, expire integer, primary key (hostname)',
         distribute_state: 'app text, env text, hostname text, current text, artifacts text, expire integer, primary key (app,env,hostname)',
         distribute:       'artifact text, app text, env text, primary key(artifact,app,env)',
-        artifacts:        'artifact text, app text, source text, altsource text, checksum text, primary key (artifact,app)',
+        artifacts:        'artifact text, app text, source text, altsource text, checksum text, multifile integer, primary key (artifact,app)',
         target:           'app text, env text, artifact text, primary key (app,env)',
         #active_env: 'app text, env text, primary key (app,env)', # That's a Cassandra Specific for joins
       }

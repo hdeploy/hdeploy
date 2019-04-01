@@ -25,7 +25,7 @@ module HDeploy
           srv_keepalive:    'hostname varchar(255), expire bigint, primary key (hostname), index (expire)',
           distribute_state: 'app varchar(255), env varchar(63), hostname varchar(255), current varchar(255), artifacts longtext, expire bigint, primary key (app,env,hostname), index (expire)',
           distribute:       'artifact varchar(255), app varchar(255), env varchar(63), primary key(artifact,app,env)',
-          artifacts:        'artifact varchar(255), app varchar(255), source longtext, altsource longtext, checksum longtext, primary key (artifact,app)',
+          artifacts:        'artifact varchar(255), app varchar(255), source longtext, altsource longtext, checksum longtext, multifile tinyint, primary key (artifact,app)',
           target:           'app varchar(255), env varchar(63), artifact varchar(255), primary key (app,env)',
         }
 
