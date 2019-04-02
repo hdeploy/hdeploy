@@ -557,9 +557,9 @@ module HDeploy
       _conf_fill_defaults
 
       # Check that there are the same number of URLs and checksums, separated by commas. This effectively only supports a few
-      build_tag = name_urls_and_checksums.split(',')
-      artifact = name_urls_and_checksums.shift()
-      raise "You need artifact name (build tag), followed by file/url/checksum triplets, separated by commas, and this is an uneven number of items" unless ar.count.
+      ar = name_urls_and_checksums.split(',')
+      build_tag = ar.shift()
+      raise "You need artifact name (build tag), followed by file/url/checksum triplets, separated by commas, and this is an uneven number of items" unless ar.count % 3 == 0 and ar.count>0
 
       source = {}
 
@@ -578,7 +578,7 @@ module HDeploy
       # push that as app name / artifact / env / urls
       @client.put("/artifact/#{@app}/#{build_tag}", JSON.pretty_generate(source))
 
-      "OK Registered #{artifact} with #{urls.count} files"
+      "OK Registered #{build_tag} with #{source.count} file(s)"
     end
 
     cli_method(:build, "Runs a local build and registers given tarball - defaults to master") do |branch = 'master'|

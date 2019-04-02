@@ -145,7 +145,7 @@ module HDeploy
       ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
 
       raw_source = request.body.read
-      source = JSON.parse(source)
+      source = JSON.parse(raw_source)
 
       # FIXME: check for source and format of source. It's a JSON that contains:
       # - filename

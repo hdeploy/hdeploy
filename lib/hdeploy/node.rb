@@ -233,6 +233,7 @@ module HDeploy
         tgz_to_keep = []
 
         artifacts.each do |artifact,artdata|
+          artdata = JSON.parse(artdata)
           puts "checking artifact #{artifact}"
           destdir   = File.join relpath,artifact
           tgzfile   = File.join tgzpath,(artifact+'.tar.gz')
