@@ -144,12 +144,18 @@ module HDeploy
       authorized?('PutArtifact', app)
       ##protected! if @env['REMOTE_ADDR'] != '127.0.0.1'
 
-      data = request.body.read
-      data = JSON.parse(data)
-      data['altsource'] ||= ''
-      data['multifile'] ||= 0
+      raw_source = request.body.read
+      source = JSON.parse(source)
 
-      @db.put_artifact(artifact, app, data['source'], data['altsource'], data['checksum'], data['multifile'])
+      # FIXME: check for source and format of source. It's a JSON that contains:
+      # - filename
+      # - decompress (or not) flag
+      # - source URL
+      # - alternative source URL
+      # - checksum
+
+      # If OK just register with a reformat.
+      @db.put_artifact(artifact, app, JSON.generate(source))
       "OK - registered artifact #{artifact} for app #{app}"
     end
 

@@ -557,18 +557,28 @@ module HDeploy
       _conf_fill_defaults
 
       # Check that there are the same number of URLs and checksums, separated by commas. This effectively only supports a few
-      ar = name_urls_and_checksums.split(',')
+      build_tag = name_urls_and_checksums.split(',')
       artifact = name_urls_and_checksums.shift()
-      raise "You need url/checksum pairs, separated by commas and this is an uneven number of items" unless ar.count.even?
+      raise "You need artifact name (build tag), followed by file/url/checksum triplets, separated by commas, and this is an uneven number of items" unless ar.count.
 
-      ar.each_slice(2) do |url,checksum|
+      source = {}
 
+      ar.each_slice(3) do |file,url,checksum|
+        #raise "File must be in a good format" unless file =~
         raise "URL #{url} does not match regex" unless url =~ /(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix
         raise "Checksum must be in MD5 format 32 hex characters" unless checksum =~ /^[a-f0-9]{32}$/
 
+        source[file] = {
+          url: url,
+          checksum: checksum,
+          decompress: false,
+        }
       end
 
       # push that as app name / artifact / env / urls
+      @client.put("/artifact/#{@app}/#{build_tag}", JSON.pretty_generate(source))
+
+      "OK Registered #{artifact} with #{urls.count} files"
     end
 
     cli_method(:build, "Runs a local build and registers given tarball - defaults to master") do |branch = 'master'|

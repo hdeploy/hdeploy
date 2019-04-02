@@ -161,6 +161,47 @@ module HDeploy
       return nil
     end
 
+    def checksum_file(file, checksum = nil)
+      if checksum.nil?
+        puts "Skipping checksum for #{file} as it was not specified"
+        return true
+      else
+        calcdigest = Digest::MD5.file(file)
+        return true if calcdigest == checksum
+        puts "incorrect checksum for #{file} (got #{calcdigest} expected #{checksum})"
+      end
+      false
+    end
+
+    def fetch_file(url, destfile, checksum = nil, retries = 5)
+      destpath = File.dirname(destfile)
+
+      count = 0
+      while count < retries and !(File.exists?(destfile) and checksum_file(destfile,checksum))
+        count += 1
+        File.unlink(destfile) if File.exists?(destfile)
+
+        if f = find_executable('aria2c')
+          puts("#{f} -x 5 -d #{destpath} -o #{destfile} #{url}")
+          system("#{f} -x 5 -d #{destpath} -o #{destfile} #{url}")
+
+        elsif f = find_executable('wget')
+          puts("#{f} -O #{destfile} #{url}")
+          system("#{f} -O #{destfile} #{url}")
+
+        elsif f = find_executable('curl')
+          puts("#{f} -o #{destfile} #{url}")
+          system("#{f} -o #{destfile} #{url}")
+
+        else
+          raise "no aria2c, wget or curl available. please install one of them."
+        end
+      end
+
+      raise "unable to download file #{destfile} from #{url}" unless File.exists? destfile
+      raise "checksum" unless checksum_file(destfile, checksum)
+    end
+
     def check_deploy
       put_state
 
@@ -200,52 +241,41 @@ module HDeploy
           if !(File.exists?readyfile)
             # we have to release. let's cleanup.
             FileUtils.rm_rf(destdir) if File.exists?(destdir)
-            count = 0
-            while count < 5 and !(File.exists?tgzfile and Digest::MD5.file(tgzfile) == artdata['checksum'])
-              count += 1
-              File.unlink tgzfile if File.exists?tgzfile
-              # FIXME: add altsource and BREAK
-              # FIXME: don't run download as root!!
-              #####
-              if f = find_executable('aria2c')
-                puts("#{f} -x 5 -d #{tgzpath} -o #{artifact}.tar.gz #{artdata['source']}")
-                system("#{f} -x 5 -d #{tgzpath} -o #{artifact}.tar.gz #{artdata['source']}")
-
-              elsif f = find_executable('wget')
-                puts("#{f} -O #{tgzfile} #{artdata['source']}")
-                system("#{f} -O #{tgzfile} #{artdata['source']}")
-
-              elsif f = find_executable('curl')
-                puts("#{f} -o #{tgzfile} #{artdata['source']}")
-                system("#{f} -o #{tgzfile} #{artdata['source']}")
-
-              else
-                raise "no aria2c, wget or curl available. please install one of them."
-              end
-            end
-
-            raise "unable to download artifact" unless File.exists?tgzfile
-
-            calcdigest = Digest::MD5.file(tgzfile)
-            raise "incorrect checksum for #{tgzfile} (got #{calcdigest} expected #{artdata['checksum']}" unless calcdigest == artdata['checksum']
-
             FileUtils.mkdir_p destdir
             FileUtils.chown user, group, destdir
             Dir.chdir destdir
 
-            chpst = ''
-            if Process.uid == 0
-              chpst = find_executable('chpst') or raise "unable to find chpst binary"
-              chpst += " -u #{user}:#{group} "
+            # Quick sanity check: only one decompress file
+            # Might do it later on but for now it's not urgent
+            raise "More than one decompress file we can't handle this" if artdata['source'].values.select{|v| v['decompress'] }.count > 1
+
+            # Now we go through sources
+            artdata['source'].sort.each do |file,sourcedata|
+              if sourcedata['decompress']
+                # First download to tgz dir and then decompress
+                # FIXME add support for altsource/url
+                fetch_file(sourcedata['url'], tgzfile, sourcedata['checksum'])
+                tar = find_executable('tar')
+
+                chpst = ''
+                if Process.uid == 0
+                  chpst = find_executable('chpst') or raise "unable to find chpst binary"
+                  chpst += " -u #{user}:#{group} "
+                end
+                system("#{chpst}#{tar} xzf #{tgzfile}") or raise "unable to extract #{tgzfile} as #{user}:#{group}"
+              else
+                # This is just a file that we are putting as-is in the directory
+                # FIXME this should contain some security check like does this have a .. or a / in it or something
+                # FIXME add support for altsource/url
+                fetch_file(sourcedata['url'], file, sourcedata['checksum'])
+              end
             end
 
-            tar = find_executable('tar')
-            system("#{chpst}#{tar} xzf #{tgzfile}") or raise "unable to extract #{tgzfile} as #{user}:#{group}"
             File.chmod 0755, destdir
 
             # Post distribute hook
             run_hook('post_distribute', {'app' => app, 'env' => env, 'artifact' => artifact})
-            FileUtils.touch(File.join(destdir,'READY')) #FIXME: root?
+            FileUtils.touch(readyfile) #FIXME: root?
           end
 
           # we only get here if previous step worked.
