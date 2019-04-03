@@ -233,7 +233,7 @@ module HDeploy
         tgz_to_keep = []
 
         artifacts.each do |artifact,artdata|
-          artdata = JSON.parse(artdata)
+          source = JSON.parse(artdata['source'])
           puts "checking artifact #{artifact}"
           destdir   = File.join relpath,artifact
           tgzfile   = File.join tgzpath,(artifact+'.tar.gz')
@@ -248,10 +248,10 @@ module HDeploy
 
             # Quick sanity check: only one decompress file
             # Might do it later on but for now it's not urgent
-            raise "More than one decompress file we can't handle this" if artdata['source'].values.select{|v| v['decompress'] }.count > 1
+            raise "More than one decompress file we can't handle this" if source.values.select{|v| v['decompress'] }.count > 1
 
             # Now we go through sources
-            artdata['source'].sort.each do |file,sourcedata|
+            source.sort.each do |file,sourcedata|
               if sourcedata['decompress']
                 # First download to tgz dir and then decompress
                 # FIXME add support for altsource/url
