@@ -243,7 +243,7 @@ module HDeploy
             # we have to release. let's cleanup.
             FileUtils.rm_rf(destdir) if File.exists?(destdir)
             FileUtils.mkdir_p destdir
-            FileUtils.chown user, group, destdir
+            FileUtils.chown user, group, destdir if Process.uid == 0
             Dir.chdir destdir
 
             # Quick sanity check: only one decompress file
@@ -252,7 +252,18 @@ module HDeploy
 
             # Now we go through sources
             source.sort.each do |file,sourcedata|
-              if sourcedata['decompress']
+
+              # First, pre-create directories if needed
+              dir = File.dirname(file)
+              FileUtils.mkdir_p(dir) unless File.directory? dir
+
+              # Second get actual data
+              if sourcedata['inline_content']
+                # This is directly inline content
+                File.write(file, sourcedata['inline_content'])
+              end
+
+              elsif sourcedata['decompress']
                 # First download to tgz dir and then decompress
                 # FIXME add support for altsource/url
                 fetch_file(sourcedata['url'], tgzfile, sourcedata['checksum'])
@@ -270,9 +281,17 @@ module HDeploy
                 # FIXME add support for altsource/url
                 fetch_file(sourcedata['url'], file, sourcedata['checksum'])
               end
+
+              # Third chmod +x if it's in the hdeploy/ directory
+              if File.fnmatch('build/*.sh', file)
+                File.chmod(0755, file)
+              end
+
             end
 
             File.chmod 0755, destdir
+            # Final chown just in case
+            FileUtils.chown_R user, group, destdir
 
             # Post distribute hook
             run_hook('post_distribute', {'app' => app, 'env' => env, 'artifact' => artifact})

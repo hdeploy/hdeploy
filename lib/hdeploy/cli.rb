@@ -3,6 +3,7 @@ require 'json'
 require 'fileutils'
 require 'inifile'
 require 'digest'
+require 'base64'
 
 module HDeploy
   class CLI
@@ -565,14 +566,24 @@ module HDeploy
 
       ar.each_slice(3) do |file,url,checksum|
         #raise "File must be in a good format" unless file =~
-        raise "URL #{url} does not match regex" unless url =~ /(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix
         raise "Checksum must be in MD5 format 32 hex characters" unless checksum =~ /^[a-f0-9]{32}$/
 
-        source[file] = {
-          url: url,
-          checksum: checksum,
-          decompress: false,
-        }
+        if url.start_with?'BASE64:'
+          # This is inline content
+          source[file] = {
+            inline_content: Base64.decode64(url[7..-1]),
+            checksum: checksum,
+            decompress: false,
+          }
+        else
+          raise "URL #{url} does not match regex" unless url =~ /(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix
+
+          source[file] = {
+            url: url,
+            checksum: checksum,
+            decompress: false,
+          }
+        end
       end
 
       # push that as app name / artifact / env / urls
