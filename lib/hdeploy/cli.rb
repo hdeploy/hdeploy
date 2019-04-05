@@ -560,7 +560,7 @@ module HDeploy
       # Check that there are the same number of URLs and checksums, separated by commas. This effectively only supports a few
       ar = name_urls_and_checksums.split(',')
       build_tag = ar.shift()
-      raise "You need artifact name (build tag), followed by file/url/checksum triplets, separated by commas, and this is an uneven number of items" unless ar.count % 3 == 0 and ar.count>0
+      raise "You need artifact name (build tag), followed by file/url/checksum triplets, separated by commas, and this is a wrong number of items (1 + #{ar.count}" unless ar.count % 3 == 0 and ar.count>0
 
       source = {}
 
@@ -748,7 +748,7 @@ module HDeploy
       raise "no server with #{@app}/#{@env}" unless h.keys.length > 0
       h.each do |host,conf|
         if !(conf['artifacts'].include? artifact_id)
-          raise "artifact #{artifact_id} is not present on server #{host}. Please run hdeploy env:#{@env} distribute:#{artifact_id}"
+          raise "artifact #{artifact_id} is not present on server #{host}. Please run hdeploy app:#{@app} env:#{@env} distribute:#{artifact_id}"
         end
       end
 

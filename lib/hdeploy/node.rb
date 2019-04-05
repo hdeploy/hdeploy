@@ -282,7 +282,7 @@ module HDeploy
               end
 
               # Third chmod +x if it's in the hdeploy/ directory
-              if File.fnmatch('build/*.sh', file)
+              if File.fnmatch('hdeploy/*.sh', file)
                 File.chmod(0755, file)
               end
 
