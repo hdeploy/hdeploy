@@ -152,6 +152,9 @@ module HDeploy
       # - decompress (or not) flag
       # - source URL
       # - alternative source URL
+      #
+      # OR inline_content instead of URL
+      #
       # - checksum
 
       # If OK just register with a reformat.
