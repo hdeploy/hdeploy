@@ -352,7 +352,7 @@ module HDeploy
       chpst = ''
       if Process.uid == 0
         chpst = find_executable('chpst') or raise "unable to find chpst binary"
-        chpst += " -u #{user}:#{group} -#{destdir}"
+        chpst += " -u #{user}:#{group} -#{destdir} "
       end
 
       system("#{chpst}#{hookfile} '#{JSON.generate(params)}'")
