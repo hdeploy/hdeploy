@@ -261,7 +261,6 @@ module HDeploy
               if sourcedata['inline_content']
                 # This is directly inline content
                 File.write(file, sourcedata['inline_content'])
-              end
 
               elsif sourcedata['decompress']
                 # First download to tgz dir and then decompress
