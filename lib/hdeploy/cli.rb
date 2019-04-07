@@ -527,7 +527,7 @@ module HDeploy
       #COmmand: pip install 'fabric<2.0'
       "fab" #FIXME: seach for binary?
 
-      (ENV.key?'fab_sshkey') "fab -i #{ENV['fab_sshkey']}" : "fab"
+      (ENV.key?'fab_sshkey') ? "fab -i #{ENV['fab_sshkey']}" : "fab"
     end
 
     def _conf_fill_defaults
