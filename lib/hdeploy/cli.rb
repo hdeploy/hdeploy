@@ -101,8 +101,9 @@ module HDeploy
     end
 
     def mysystem(cmd)
+      puts "Debug: running #{cmd}"
       system cmd
-      raise "error running #{cmd} #{$?}" unless $?.success?
+      #raise "error running #{cmd} #{$?}" unless $?.success?
     end
 
     def fab # looking for python 'fabric'
@@ -723,11 +724,11 @@ module HDeploy
         end
 
         # On all servers, do a standard check deploy.
-        system("#{_fab} -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- sudo /usr/local/bin/hdeploy_node check_deploy")
+        mysystem("#{_fab} -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- sudo /usr/local/bin/hdeploy_node check_deploy")
 
         # And on a single server, run the single hook.
         hookparams = { app: @app, env: @env, artifact: build_tag, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-        system("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_distribute_run_once'")
+        mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_distribute_run_once'")
       end
     end
 
@@ -755,11 +756,11 @@ module HDeploy
       end
 
       # On all servers, do a standard symlink
-      system("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'")
+      mysystem("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'")
 
       # And on a single server, run the single hook.
       hookparams = { app: @app, env: @env, artifact: artifact_id, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-      system("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'")
+      mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'")
     end
   end
 end
