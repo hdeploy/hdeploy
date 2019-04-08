@@ -323,8 +323,14 @@ module HDeploy
     cli_method(:prune, "Deletes oldest artifacts in specified environment - defaults to unused artifacts only") do |prune_env='nowhere'|
       _conf_fill_defaults
       c = @conf['build'][@app]
-      prune_count = c['prune'].to_i #FIXME: integrity check.
-      raise "no proper prune count" unless prune_count >= 3 and prune_count < 20
+
+      if not c.nil? and c.key?'prune'
+        prune_count = c['prune'].to_i #FIXME: integrity check.
+        raise "no proper prune count" unless prune_count >= 3 and prune_count < 20
+      else
+        # Just default to 5
+        prune_count = 5
+      end
 
       dist = JSON.parse(@client.get("/distribute/#{@app}"))
       if dist.has_key? prune_env
@@ -339,7 +345,7 @@ module HDeploy
           if prune_env == 'nowhere'
             # We take EVERYTHING into account
             artifacts_to_keep[dist_state['current']] = true
-            dist_state['artifact_dir'].each do |art|
+            dist_state['artifacts'].each do |art|
               artifacts_to_keep[art] = true
             end
 

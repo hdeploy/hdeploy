@@ -186,8 +186,8 @@ module HDeploy
           system("#{f} -x 5 -d #{destpath} -o #{destfile} #{url}")
 
         elsif f = find_executable('wget')
-          puts("#{f} -O #{destfile} #{url}")
-          system("#{f} -O #{destfile} #{url}")
+          puts("#{f} -nv -O #{destfile} #{url}")
+          system("#{f} -nv -O #{destfile} #{url}")
 
         elsif f = find_executable('curl')
           puts("#{f} -o #{destfile} #{url}")

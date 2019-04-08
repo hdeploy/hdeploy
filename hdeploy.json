@@ -2,7 +2,7 @@
   "api": {
     "http_user": "pviet",
     "http_password": "derp",
-    "endpoint": "http://10.116.250.155:8080"
+    "endpoint": "https://hdeploy.stg.k8s.ue1.smartertravel.net"
   },
   "cli": {
     "default_app": "demoapp",

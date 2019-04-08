@@ -3,11 +3,5 @@
 require 'hdeploy'
 require 'pry'
 
-db = HDeploy::Database.factory
-
-binding.pry
-
-#cass.execute("")
-
-exit
-
+n = HDeploy::Node.new
+puts n.fetch_file('https://www.free.fr/freebox/index.html','file.html','5740ab08974f6e412e609c1cb6dbc44d')
