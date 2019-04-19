@@ -15,6 +15,7 @@ module HDeploy
       if conf_path.nil?
         try_path = %w[
           .
+          ~/.hdeploy
           etc
           /etc/hdeploy
           /opt/hdeploy/etc
@@ -24,8 +25,9 @@ module HDeploy
         ]
 
         try_path.each do |p|
-          if File.exists?(File.join(p, 'hdeploy.json'))
-            conf_path = File.expand_path(p)
+          ex_p = File.expand_path(p)
+          if File.exists?(File.join(ex_p, 'hdeploy.json'))
+            conf_path = ex_p
             break
           end
         end
