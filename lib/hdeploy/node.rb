@@ -3,6 +3,7 @@ require 'json'
 require 'fileutils'
 require 'pathname'
 require 'inifile'
+require 'mimemagic'
 
 module HDeploy
   class Node
@@ -47,7 +48,7 @@ module HDeploy
         # FIXME: throw exception if user/group are root and/or don't exist
         {
           'relpath' => File.expand_path('../releases', c['symlink']),
-          'tgzpath' => File.expand_path('../tarballs', c['symlink']),
+          'arcpath' => File.expand_path('../archives', c['symlink']),
           'user' => default_user,
           'group' => default_group,
           'quorum_force_deploy' => true,
@@ -114,7 +115,7 @@ module HDeploy
       @conf['deploy'].each do |section,conf|
         app,env = section.split(':')
 
-        relpath,tgzpath,symlink = conf.values_at('relpath','tgzpath','symlink')
+        relpath,arcpath,symlink = conf.values_at('relpath','arcpath','symlink')
 
         # could be done with ternary operator but I find it more readable like that.
         current = "unknown"
@@ -216,7 +217,7 @@ module HDeploy
 
         # Here we get the info.
         # FIXME: double check that config is ok
-        relpath,tgzpath,symlink,user,group,quorum_force_deploy = conf.values_at('relpath','tgzpath','symlink','user','group','quorum_force_deploy')
+        relpath,arcpath,symlink,user,group,quorum_force_deploy = conf.values_at('relpath','arcpath','symlink','user','group','quorum_force_deploy')
 
         # Now the release info from the server
         c.url = @conf['api']['endpoint'] + '/distribute/' + app + '/' + env
@@ -224,7 +225,7 @@ module HDeploy
 
         # prepare directories
         FileUtils.mkdir_p(relpath)
-        FileUtils.mkdir_p(tgzpath)
+        FileUtils.mkdir_p(arcpath)
 
         artifacts = JSON.parse(c.body_str)
         puts "found #{artifacts.keys.length} artifacts for #{app} / #{env}"
@@ -236,7 +237,7 @@ module HDeploy
           source = JSON.parse(artdata['source'])
           puts "checking artifact #{artifact}"
           destdir   = File.join relpath,artifact
-          tgzfile   = File.join tgzpath,(artifact+'.tar.gz')
+          arcfile   = File.join arcpath,(artifact+'.archive')
           readyfile = File.join destdir,'READY'
 
           if !(File.exists?readyfile)
@@ -265,15 +266,34 @@ module HDeploy
               elsif sourcedata['decompress']
                 # First download to tgz dir and then decompress
                 # FIXME add support for altsource/url
-                fetch_file(sourcedata['url'], tgzfile, sourcedata['checksum'])
-                tar = find_executable('tar')
+                fetch_file(sourcedata['url'], arcfile, sourcedata['checksum'])
 
                 chpst = ''
                 if Process.uid == 0
                   chpst = find_executable('chpst') or raise "unable to find chpst binary"
                   chpst += " -u #{user}:#{group} "
                 end
-                system("#{chpst}#{tar} xzf #{tgzfile}") or raise "unable to extract #{tgzfile} as #{user}:#{group}"
+
+                magic = MimeMagic.by_magic(File.open(arcfile))
+
+                if magic.subtype == 'gzip'
+                  # We're gonna open this with gzipreader to determine the subfile
+                  # Subfile: MimeMagic.by_magic(Zlib::GzipReader.open(arcfile).gets(200)).
+                  # The gets is because GzipReader is not a real IO file and you need the first 170 or so characters for .tar
+                  # FIXME: read the beginning of the gzip
+                  # For now just assume it's a tar gz
+                  tar = find_executable('tar')
+                  system("#{chpst}#{tar} xzf #{arcfile}") or raise "unable to extract #{arcfile} as #{user}:#{group}"
+
+                elsif magic.subtype == 'zip'
+                  # This could be a jar too
+                  # FIXME: check for directories in zip! (can a zip contain / ??)
+                  zip = find_executable('unzip')
+                  system("#{chpst}#{unzip} -q -o -u #{arcfile}") or raise "unable to extract #{arcfile} as #{user}:#{group}"
+
+                else
+                  raise "Unsupported magic subtype for for file #{arcfile} : '#{magic.subtype}' - supported: gzip and zip (jar)"
+                end
               else
                 # This is just a file that we are putting as-is in the directory
                 # FIXME this should contain some security check like does this have a .. or a / in it or something
@@ -298,7 +318,7 @@ module HDeploy
           end
 
           # we only get here if previous step worked.
-          tgz_to_keep << File.expand_path(tgzfile)
+          tgz_to_keep << File.expand_path(arcfile)
           dir_to_keep << File.expand_path(destdir)
         end
 
@@ -315,7 +335,7 @@ module HDeploy
           FileUtils.rm_rf d
         end
 
-        (Dir.glob(File.join conf['tgzpath'],'*') - tgz_to_keep).each do |f|
+        (Dir.glob(File.join conf['arcpath'],'*') - tgz_to_keep).each do |f|
           puts "cleanup file #{f}"
           File.unlink f
         end
