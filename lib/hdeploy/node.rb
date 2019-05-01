@@ -483,6 +483,8 @@ module HDeploy
           if force # This is a manual run - we are going to do post_symlink_fail handling then
             puts "Running post_symlink_fail since this a force run"
             run_hook('post_symlink_fail', {'app' => app, 'env' => env, 'artifact' => target})
+          else
+            puts "This is not a force run so not doing post_symlink_fail"
           end
           raise e
         end
