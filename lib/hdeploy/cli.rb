@@ -37,6 +37,7 @@ module HDeploy
       @app = @conf['cli']['default_app']
       @env = @conf['cli']['default_env']
       @verbose = false
+      @ignore_error = false
 
 
       @conf.each do |k|
@@ -100,10 +101,10 @@ module HDeploy
       #end
     end
 
-    def mysystem(cmd)
+    def mysystem(cmd, ignore_error = false)
       puts "Debug: running #{cmd}"
       system cmd
-      #raise "error running #{cmd} #{$?}" unless $?.success?
+      raise "error running #{cmd} #{$?}" unless ignore_error or $?.success?
     end
 
     def fab # looking for python 'fabric'
@@ -168,6 +169,9 @@ module HDeploy
       @verbose = true
     end
 
+    cli_method(:ignore_error, "Modifier for other commands") do
+      @ignore_error = true
+    end
 
     cli_method(:app, "Modifier for other commands - sets current app") do |appname|
       @app = appname
@@ -516,7 +520,7 @@ module HDeploy
     def notify(msg)
       puts "Notification: #{msg}"
       if File.executable?('/usr/local/bin/hdeploy_hipchat')
-        mysystem("/usr/local/bin/hdeploy_hipchat #{msg}")
+        mysystem("/usr/local/bin/hdeploy_hipchat #{msg}", true)
       end
     end
 
@@ -638,7 +642,7 @@ module HDeploy
         'git remote show origin',
         'git remote prune origin',
       ].each do |cmd|
-        mysystem(cmd)
+        mysystem(cmd, true)
       end
 
       # Choose branch
@@ -650,7 +654,7 @@ module HDeploy
           'git clean -xdf',
           'git pull'
         ].each do |cmd|
-          mysystem(cmd)
+          mysystem(cmd, true)
         end
       end
 
@@ -730,11 +734,11 @@ module HDeploy
         end
 
         # On all servers, do a standard check deploy.
-        mysystem("#{_fab} -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- sudo /usr/local/bin/hdeploy_node check_deploy")
+        mysystem("#{_fab} -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- sudo /usr/local/bin/hdeploy_node check_deploy", @ignore_error)
 
         # And on a single server, run the single hook.
         hookparams = { app: @app, env: @env, artifact: build_tag, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-        mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_distribute_run_once'")
+        mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_distribute_run_once'", @ignore_error)
       end
     end
 
@@ -762,11 +766,11 @@ module HDeploy
       end
 
       # On all servers, do a standard symlink
-      mysystem("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'")
+      mysystem("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'", @ignore_error)
 
       # And on a single server, run the single hook.
       hookparams = { app: @app, env: @env, artifact: artifact_id, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-      mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'")
+      mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'", @ignore_error)
     end
   end
 end
