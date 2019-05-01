@@ -501,6 +501,10 @@ module HDeploy
       @client.delete("/distribute/#{@app}/#{@env}/#{artifact_id}")
     end
 
+    cli_method(:unregister, "Deletes an artifact from the database - fully") do |artifact_id|
+      @client.delete("/artifact/#{@app}/#{artifact_id}")
+    end
+
     cli_method(:init, "Alias for initrepo") do
       init()
     end
