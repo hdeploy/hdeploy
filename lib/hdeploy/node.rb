@@ -477,7 +477,15 @@ module HDeploy
         File.rename(link + '.tmp', link)
         put_state
 
-        run_hook('post_symlink', {'app' => app, 'env' => env, 'artifact' => target})
+        begin
+          run_hook('post_symlink', {'app' => app, 'env' => env, 'artifact' => target})
+        rescue Exception => e
+          if force # This is a manual run - we are going to do post_symlink_fail handling then
+            puts "Running post_symlink_fail since this a force run"
+            run_hook('post_symlink_fail', {'app' => app, 'env' => env, 'artifact' => target})
+          end
+          raise e
+        end
       else
         puts "not changing symlink for app #{app}"
       end
