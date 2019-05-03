@@ -4,6 +4,7 @@ require 'fileutils'
 require 'inifile'
 require 'digest'
 require 'base64'
+require 'net/ssh/multi'
 
 module HDeploy
   class CLI
@@ -776,6 +777,26 @@ module HDeploy
       hookparams = { app: @app, env: @env, artifact: artifact_id, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
       mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'", @ignore_errors)
     end
+
+    cli_method(:symlink2, "test") do
+      h = JSON.parse(@client.get("/srv/by_app/#{@app}/#{@env}"))
+
+      Net::SSH::Multi.start(:concurrent_connections => 5) do |session|
+
+        h.keys.each do |srv|
+          session.use srv
+        end
+
+        session.exec 'uptime ; sleep 5'
+
+      end
+
+      h.keys
+
+      require 'pry'
+      binding.pry
+    end
+
   end
 end
 
