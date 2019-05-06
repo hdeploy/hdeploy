@@ -298,12 +298,12 @@ module HDeploy
                 # This is just a file that we are putting as-is in the directory
                 # FIXME this should contain some security check like does this have a .. or a / in it or something
                 # FIXME add support for altsource/url
-                fetch_file(sourcedata['url'], file, sourcedata['checksum'])
+                fetch_file(sourcedata['url'], File.join(destdir,file), sourcedata['checksum'])
               end
 
               # Third chmod +x if it's in the hdeploy/ directory
               if File.fnmatch('hdeploy/*.sh', file)
-                File.chmod(0755, file)
+                File.chmod(0755, File.join(destdir,file))
               end
 
             end
