@@ -254,9 +254,11 @@ module HDeploy
             # Now we go through sources
             source.sort.each do |file,sourcedata|
 
-              # First, pre-create directories if needed
-              dir = File.dirname(file)
-              FileUtils.mkdir_p(dir) unless File.directory? dir
+              # First, pre-create directories - only if needed
+              if File.include?'/'
+                subdir = File.dirname(file)
+                FileUtils.mkdir_p(File.join(destdir,dir)) unless File.directory? (File.join(destdir,dir))
+              end
 
               # Second get actual data
               if sourcedata['inline_content']
