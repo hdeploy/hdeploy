@@ -255,7 +255,7 @@ module HDeploy
             source.sort.each do |file,sourcedata|
 
               # First, pre-create directories - only if needed
-              if File.include?'/'
+              if file.include?'/'
                 subdir = File.dirname(file)
                 FileUtils.mkdir_p(File.join(destdir,dir)) unless File.directory? (File.join(destdir,dir))
               end
