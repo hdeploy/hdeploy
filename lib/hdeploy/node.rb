@@ -257,7 +257,7 @@ module HDeploy
               # First, pre-create directories - only if needed
               if file.include?'/'
                 subdir = File.dirname(file)
-                FileUtils.mkdir_p(File.join(destdir,dir)) unless File.directory? (File.join(destdir,dir))
+                FileUtils.mkdir_p(File.join(destdir,subdir)) unless File.directory? (File.join(destdir,subdir))
               end
 
               # Second get actual data
