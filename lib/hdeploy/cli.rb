@@ -38,7 +38,7 @@ module HDeploy
       @env = @conf['cli']['default_env']
       @verbose = false
       @ignore_errors = false
-
+      @parallel = false
 
       @conf.each do |k|
         next unless k[0..3] == 'app:'
@@ -501,6 +501,10 @@ module HDeploy
       @client.delete("/distribute/#{@app}/#{@env}/#{artifact_id}")
     end
 
+    cli_method(:parallel, "Make a parallel symlink (all happen at the same time") do
+      @parallel = true
+    end
+
     cli_method(:unregister, "Deletes an artifact from the database - fully") do |artifact_id|
       @client.delete("/artifact/#{@app}/#{artifact_id}")
     end
@@ -770,11 +774,11 @@ module HDeploy
       end
 
       # On all servers, do a standard symlink
-      mysystem("#{_fab}  -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'", @ignore_errors)
+      mysystem("#{_fab}  -H #{h.keys.join(',')} #{@parallel ? '-P ':''}#{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'", @ignore_errors)
 
       # And on a single server, run the single hook.
       hookparams = { app: @app, env: @env, artifact: artifact_id, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-      mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'", @ignore_errors)
+      mysystem("#{_fab} -H #{h.keys.sample} #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_symlink_run_once'", @ignore_errors)
     end
   end
 end
