@@ -314,6 +314,8 @@ module HDeploy
             # Final chown just in case
             FileUtils.chown_R user, group, destdir
 
+            display_hooks({'app' => app, 'env' => env, 'artifact' => target})
+
             # Post distribute hook
             run_hook('post_distribute', {'app' => app, 'env' => env, 'artifact' => artifact})
             FileUtils.touch(readyfile) #FIXME: root?
@@ -346,6 +348,33 @@ module HDeploy
       put_state
     end
 
+    def display_hooks(params)
+      app,env,artifact = params.values_at('app','env','artifact')
+
+      raise "no such app/env #{app} / #{env}" unless @conf['deploy'].has_key? "#{app}:#{env}"
+
+      relpath,user,group = @conf['deploy']["#{app}:#{env}"].values_at('relpath','user','group')
+      destdir = File.join relpath,artifact
+
+      existing_hooks = []
+      absent_hooks = []
+
+      %w[post_distribute pre_symlink post_symlink post_symlink_fail].each do |f|
+        full_hook_file = "#{destdir}/hdeploy/#{f}.sh"
+        if File.exists? full_hook_file
+          if File.executable? full_hook_file
+            existing_hooks << f
+          else
+            raise "hook #{hook} for #{app}/#{env}/#{artifact} is not executable - this is a problem."
+          end
+        else
+          absent_hooks << f
+        end
+      end
+
+      puts "INFO: for #{app}/#{env}/#{artifact}: found hooks #{existing_hooks.join(' ')} - no hooks for #{absent_hooks.join(' ')}"
+    end
+
     def run_hook(hook,params)
       # This is a generic function to run the hooks defined in hdeploy.json.
       # Standard hooks are
@@ -364,7 +393,7 @@ module HDeploy
       if File.exists? hookfile
         raise "non-executable file #{hookfile} for hook #{hook}" unless File.executable?(hookfile)
       else
-        puts "No hook file for #{hook} (look for #{hookfile} - doing nothing"
+        #puts "DEBUG: not running hook #{hook} for #{app}/#{env}/#{artifact} as file #{hookfile} was not found (note: this is not necessarily an error)"
         return
       end
 
@@ -472,6 +501,20 @@ module HDeploy
 
       if force or !(File.exists?link)
         FileUtils.rm_rf(link) unless File.symlink?link
+
+        display_hooks({'app' => app, 'env' => env, 'artifact' => target})
+
+        begin
+          run_hook('pre_symlink', {'app' => app, 'env' => env, 'artifact' => target})
+        rescue Exception => e
+          if force # This is a manual run - we are going to do post_symlink_fail handling then
+            puts "Running pre_symlink_fail since this a force run"
+            run_hook('pre_symlink_fail', {'app' => app, 'env' => env, 'artifact' => target})
+          else
+            puts "This is not a force run so not doing pre_symlink_fail"
+          end
+          raise e
+        end
 
         # atomic symlink override
         puts "setting symlink for app #{app} to #{target_relative_path}"
