@@ -502,7 +502,7 @@ module HDeploy
       if force or !(File.exists?link)
         FileUtils.rm_rf(link) unless File.symlink?link
 
-        display_hooks({'app' => app, 'env' => env, 'artifact' => target})
+        display_hooks({'app' => app, 'env' => env, 'artifact' => artifact})
 
         begin
           run_hook('pre_symlink', {'app' => app, 'env' => env, 'artifact' => target})
