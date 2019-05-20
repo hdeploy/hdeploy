@@ -314,7 +314,7 @@ module HDeploy
             # Final chown just in case
             FileUtils.chown_R user, group, destdir
 
-            display_hooks({'app' => app, 'env' => env, 'artifact' => target})
+            display_hooks({'app' => app, 'env' => env, 'artifact' => artifact})
 
             # Post distribute hook
             run_hook('post_distribute', {'app' => app, 'env' => env, 'artifact' => artifact})
