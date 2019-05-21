@@ -179,6 +179,13 @@ module HDeploy
 
       count = 0
       while count < retries and !(File.exists?(destfile) and checksum_file(destfile,checksum))
+
+        if count > 0
+          wait_time = (2 ** count) + rand( 2 ** count ) # At 2nd attempt, this will wait between 4 and 7 seconds
+          puts "BACKOFF: waiting for #{wait_time} seconds before next retry"
+          sleep wait_time
+        end
+
         count += 1
         File.unlink(destfile) if File.exists?(destfile)
 
