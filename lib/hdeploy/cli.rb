@@ -742,11 +742,11 @@ module HDeploy
         end
 
         # On all servers, do a standard check deploy.
-        mysystem("#{_fab} -H #{h.keys.join(',')} -P #{_hostmonkeypatch()}-- sudo /usr/local/bin/hdeploy_node check_deploy", @ignore_errors)
+        mysystem("#{_fab} -H #{h.keys.join(',')} #{@parallel ? '-P ':''}#{_hostmonkeypatch()}-- sudo /usr/local/bin/hdeploy_node check_deploy", @ignore_errors)
 
         # And on a single server, run the single hook.
         hookparams = { app: @app, env: @env, artifact: build_tag, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
-        mysystem("#{_fab} -H #{h.keys.sample} -P #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_distribute_run_once'", @ignore_errors)
+        mysystem("#{_fab} -H #{h.keys.sample} #{_hostmonkeypatch()}-- 'echo #{hookparams} | sudo /usr/local/bin/hdeploy_node post_distribute_run_once'", @ignore_errors)
       end
     end
 
