@@ -596,6 +596,14 @@ module HDeploy
             checksum: checksum,
             decompress: false,
           }
+        elsif file == '/'
+          raise "URL #{url} does not match regex" unless url =~ /(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix
+
+          source[file] = {
+            url: url,
+            checksum: checksum,
+            decompress: true,
+          }
         else
           raise "URL #{url} does not match regex" unless url =~ /(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix
 
