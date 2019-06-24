@@ -276,7 +276,7 @@ module HDeploy
     end
 
     # -----------------------------------------------------------------------------
-    api_endpoint(:get, '/distribute_lock/:app/:env', , 'GetDistributeLock', "Read a lock for auto-consistency checks") do |app,env|
+    api_endpoint(:get, '/distribute_lock/:app/:env', 'GetDistributeLock', "Read a lock for auto-consistency checks") do |app,env|
       r = @db.get_distribute_lock(app,env)
       r.count == 1 ? r.first["comment"] : "UNLOCKED"
     end
