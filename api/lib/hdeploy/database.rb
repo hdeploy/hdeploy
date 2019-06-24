@@ -55,6 +55,11 @@ module HDeploy
         get_srv_by_app_env: 'SELECT hostname,current,artifacts FROM distribute_state WHERE app = ? AND env = ?',
         get_srv_by_app:     'SELECT hostname,current,artifacts FROM distribute_state WHERE app = ?',
 
+        # In case we try an auto consistency check
+        get_distribute_lock:'SELECT comment FROM distribute_lock WHERE app = ? AND env = ?',
+        put_distribute_lock: "REPLACE INTO distribute_lock (app,env,comment) VALUES(?,?,?)",
+        delete_distribute_lock: 'DELETE FROM distribute_lock WHERE app = ? AND env = ?',
+
         # BIG GETS
         get_distributed_apps: 'SELECT distinct(app) FROM distribute_state',
         get_configured_apps: 'SELECT distinct(app) FROM distribute',
@@ -70,6 +75,7 @@ module HDeploy
         distribute:       'artifact text, app text, env text, primary key(artifact,app,env)',
         artifacts:        'artifact text, app text, source text, primary key (artifact,app)',
         target:           'app text, env text, artifact text, primary key (app,env)',
+        distribute_lock:  'app text, env text, expire integer, comment text, primary key (app,env)',
         #active_env: 'app text, env text, primary key (app,env)', # That's a Cassandra Specific for joins
       }
     end

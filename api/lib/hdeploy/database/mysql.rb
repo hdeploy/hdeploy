@@ -13,12 +13,14 @@ module HDeploy
           # These are special just because they expire
           put_keepalive: "REPLACE INTO srv_keepalive (hostname,expire) VALUES(?,UNIX_TIMESTAMP(NOW()) + ?)",
           put_distribute_state: "REPLACE INTO distribute_state (app,env,hostname,current,artifacts,expire) VALUES(?,?,?,?,?,UNIX_TIMESTAMP(NOW()) + 1800)",
+          put_distribute_lock: "REPLACE INTO distribute_lock (app,env,comment,expire) VALUES(?,?,?,UNIX_TIMESTAMP(NOW()) + 3600)",
 
           # FIXME ADD some ? and on duplicate key update
 
           # Special stuff for SQL expiration
           expire_distribute_state: "DELETE FROM distribute_state WHERE expire < UNIX_TIMESTAMP(NOW())",
           expire_keepalive: "DELETE FROM srv_keepalive WHERE expire < UNIX_TIMESTAMP(NOW())",
+          expire_distribute_lock: "DELETE FROM distribute_lock WHERE expire < UNIX_TIMESTAMP(NOW())",
         })
 
         @schemas = {
@@ -27,6 +29,7 @@ module HDeploy
           distribute:       'artifact varchar(255), app varchar(255), env varchar(63), primary key(artifact,app,env)',
           artifacts:        'artifact varchar(255), app varchar(255), source longtext, primary key (artifact,app)',
           target:           'app varchar(255), env varchar(63), artifact varchar(255), primary key (app,env)',
+          distribute_lock:  'app varchar(255), env varchar(63), expire bigint, comment text, primary key (app,env)',
         }
 
         # FIXME: regular run of expire?
@@ -67,6 +70,8 @@ module HDeploy
             puts "Distribute state: #{@db.affected_rows} changes"
             expire_keepalive
             puts "Keepalive: #{@db.affected_rows} changes"
+            expire_distribute_lock
+            puts "Distribute lock: #{@db.affected_rows} changes"
           end
         else
           raise "No such query/method #{m} in class HDeploy::Database::SQLite"

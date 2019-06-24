@@ -214,7 +214,6 @@ module HDeploy
       JSON.pretty_generate(r)
     end
 
-
     # -----------------------------------------------------------------------------
     api_endpoint(:get, '/distribute/:app', 'GetDistribute', 'All distributed artifacts for this app') do |app|
       r = {}
@@ -260,8 +259,6 @@ module HDeploy
 
     # -----------------------------------------------------------------------------
     api_endpoint(:put, '/distribute/:app/:env', 'PutDistribute', "Distribute an artifact (in body) to app/env") do |app,env|
-      authorized?('PutDistribute',app,env)
-
       artifact = request.body.read.force_encoding('US-ASCII')
 
       if @db.get_artifact(app,artifact).count == 1
@@ -276,6 +273,24 @@ module HDeploy
       authorized?('DeleteDistribute',app,env)
       @db.delete_distribute(app,env,artifact)
       "OK will not distribute artifact #{artifact} for app #{app} in environment #{env}"
+    end
+
+    # -----------------------------------------------------------------------------
+    api_endpoint(:get, '/distribute_lock/:app/:env', , 'GetDistributeLock', "Read a lock for auto-consistency checks") do |app,env|
+      r = @db.get_distribute_lock(app,env)
+      r.count == 1 ? r.first["comment"] : "UNLOCKED"
+    end
+
+    api_endpoint(:put, '/distribute_lock/:app/:env', 'PutDistributeLock', "Set a lock for auto-consistency checks") do |app,env|
+      comment = request.body.read
+      comment = "From #{env['REMOTE_ADDR']}" if comment.length == 0 or comment == "UNLOCKED"
+
+      @db.put_distribute_lock(app,env,comment)
+      "OK - locked app/env #{app}/#{env}"
+    end
+
+    api_endpoint(:delete, '/distribute_lock/:app/:env', 'DeleteDistributeLock', "Delete a lock for auto-consistency checks") do |app,env|
+      @db.delete_distribute_lock(app,env)
     end
 
     # -----------------------------------------------------------------------------
