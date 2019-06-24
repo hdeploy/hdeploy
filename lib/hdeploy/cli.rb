@@ -782,7 +782,9 @@ module HDeploy
       end
 
       # On all servers, do a standard symlink
+      @client.put("/distribute_lock/#{@app}/#{@env}","Deploy on #{`hostname`.chomp} by unix user #{ENV['USER']}")
       mysystem("#{_fab}  -H #{h.keys.join(',')} #{@parallel ? '-P ':''}#{_hostmonkeypatch()}-- 'echo app:#{@app} env:#{@env} force:true | sudo /usr/local/bin/hdeploy_node symlink'", @ignore_errors)
+      @client.delete("/distribute_lock/#{@app}/#{@env}")
 
       # And on a single server, run the single hook.
       hookparams = { app: @app, env: @env, artifact: artifact_id, servers:h.keys.join(','), user: ENV['USER'] }.collect {|k,v| "#{k}:#{v}" }.join(" ")
