@@ -54,6 +54,14 @@ module HDeploy
 
         get_srv_by_app_env: 'SELECT hostname,current,artifacts FROM distribute_state WHERE app = ? AND env = ?',
         get_srv_by_app:     'SELECT hostname,current,artifacts FROM distribute_state WHERE app = ?',
+
+        # BIG GETS
+        get_distributed_apps: 'SELECT distinct(app) FROM distribute_state',
+        get_configured_apps: 'SELECT distinct(app) FROM distribute',
+        get_full_distribute_state: 'SELECT app,env,hostname,current,artifacts FROM distribute_state',
+        get_full_target: 'SELECT app,env,artifact FROM target',
+        get_full_artifacts: 'SELECT artifact,app,source FROM artifacts'
+
       }
 
       @schemas = {

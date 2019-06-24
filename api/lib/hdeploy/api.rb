@@ -3,6 +3,7 @@ require 'json'
 require 'hdeploy/conf'
 require 'hdeploy/database'
 require 'hdeploy/policy'
+require 'pry'
 
 #require 'hdeploy/policy'
 
@@ -41,10 +42,16 @@ module HDeploy
             authorized?(policy_action_name, params[:app], params[:env])
             instance_exec(*args, &block)
           end
-        else
+        elsif block.parameters.map{|p| p.last}.include? :env
           send(method, uri) do |*args|
             authorized?(policy_action_name, args.first, params[:env])
             # The instance exec passes the env such as request params etc
+            instance_exec(*args, &block)
+          end
+        else
+          # No specifics - env defaults to nil
+          send(method, uri) do |*args|
+            authorized?(policy_action_name, args.first)
             instance_exec(*args, &block)
           end
         end
@@ -280,6 +287,33 @@ module HDeploy
           'current' => row['current'],
           'artifacts' => row['artifacts'].split(','),
         }
+      end
+
+      JSON.pretty_generate(r)
+    end
+
+    # -----------------------------------------------------------------------------
+    api_endpoint(:get, '/dump/:type', 'GetDump', 'Dumping tools') do |type|
+
+      binding.pry
+      q = case type
+      when 'distributed_app'
+        @db.get_distributed_apps()
+      when 'configured_app'
+        @db.get_configured_apps()
+      when 'distribute_state'
+        @db.get_full_distribute_state()
+      when 'target'
+        @db.get_full_target()
+      when 'artifacts'
+        @db.get_full_artifacts()
+      else
+        halt 500, "try among distribute_app, configured_app, distribute_state, target, artifacts"
+      end
+
+      r = []
+      q.each do |row|
+        r << row
       end
 
       JSON.pretty_generate(r)
