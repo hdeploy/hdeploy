@@ -291,6 +291,7 @@ module HDeploy
 
     api_endpoint(:delete, '/distribute_lock/:app/:env', 'DeleteDistributeLock', "Delete a lock for auto-consistency checks") do |app,env|
       @db.delete_distribute_lock(app,env)
+      "OK - deleted lock from app/env"
     end
 
     # -----------------------------------------------------------------------------

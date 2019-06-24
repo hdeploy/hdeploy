@@ -476,11 +476,21 @@ module HDeploy
       else
         # This is where we decide to maybe do something
         if quorum_force_deploy and !force # force always decides to do something
-          c = Curl::Easy.new(@conf['api']['endpoint'] + '/target_state/' + app + '/' + env)
+          c = Curl::Easy.new(@conf['api']['endpoint'] + '/distribute_lock/' + app + '/' + env)
           c.http_auth_types = :basic
           c.username = @conf['api']['http_user']
           c.password = @conf['api']['http_password']
           c.perform
+
+          if c.body_str != "UNLOCKED"
+            puts "Distribute_lock: skipping quorum test for #{app}/#{env} - comment: #{c.body_str}"
+            return
+          end
+
+          # Go to next step where we actually parse things
+          c.url = @conf['api']['endpoint'] + '/target_state/' + app + '/' + env
+          c.perform
+
           target_state = JSON.parse(c.body_str)
 
           if target_state.count == 0
