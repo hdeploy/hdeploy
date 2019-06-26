@@ -4,6 +4,7 @@ require 'fileutils'
 require 'pathname'
 require 'inifile'
 require 'mimemagic'
+require 'pidfile'
 
 module HDeploy
   class Node
@@ -211,6 +212,7 @@ module HDeploy
     end
 
     def check_deploy
+      pf = PidFile.new
       put_state
 
       c = Curl::Easy.new()
