@@ -68,6 +68,29 @@ module HDeploy
     end
 
     # -------------------------------------------------------------------------
+    # So far only used for pidfile but might be useful later on...
+    # Could make a ruby gem out of it
+    def try_with_exponential_wait(max_tries, exception_type_allowed = Exception)
+      current_tries = 0
+      loop do
+        begin
+          r = yield
+          puts "Block retry successful"
+          return r
+        rescue Exception => e
+          raise e unless e.is_a?(exception_type_allowed)
+          current_tries += 1
+          if current_tries >= max_tries
+            raise e
+          end
+          sleep_time = (2 ** current_tries + rand(2 ** current_tries))
+          puts "Got exception: #{e.class} - waiting #{sleep_time} secs till it clears up"
+          sleep sleep_time
+        end
+      end
+    end
+
+    # -------------------------------------------------------------------------
     def run
       # Performance: require here so that launching other stuff doesn't load the library
       require 'eventmachine'
@@ -212,7 +235,13 @@ module HDeploy
     end
 
     def check_deploy
-      pf = PidFile.new
+
+      # It will be ok up to 10 times to have a duplicate process error
+      # Then it actually throws an exception
+      pf = try_with_exponential_wait(10, PidFile::DuplicateProcessError) do
+        PidFile.new(pidfile: 'hdeploy_node_check_deploy.pid')
+      end
+
       put_state
 
       c = Curl::Easy.new()
